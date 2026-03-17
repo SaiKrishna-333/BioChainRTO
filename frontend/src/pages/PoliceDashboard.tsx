@@ -1,0 +1,727 @@
+import { useState, useEffect } from "react";
+import { useAuth } from "../context/useAuth";
+import { useNavigate } from "react-router-dom";
+
+import type {
+  QuickVerifyResult,
+  DetailedVehicleResult,
+  PersonVerifyResult,
+  TheftReportAdmin,
+} from "../types/api";
+
+export default function PoliceDashboard() {
+  const { user, logout, api } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!user) navigate("/login");
+  }, [user, navigate]);
+
+  const [regNumber, setRegNumber] = useState("");
+  const [aadhaarOrDl, setAadhaarOrDl] = useState("");
+  type VerificationResult =
+    | QuickVerifyResult
+    | DetailedVehicleResult
+    | PersonVerifyResult
+    | null;
+
+  const [result, setResult] = useState<VerificationResult>(null);
+  const [activeTab, setActiveTab] = useState("quickVerify"); // 'quickVerify', 'detailedVerify', 'personVerify', 'theftReports', 'profile'
+  const [theftReports, setTheftReports] = useState<TheftReportAdmin[]>([]);
+  const [recoveryData, setRecoveryData] = useState<{
+    [key: string]: {
+      recoveryDate?: string;
+      recoveryLocation?: string;
+      remarks?: string;
+    };
+  }>({});
+  const [profileData, setProfileData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+    aadhaarNumber: "",
+    dlNumber: "",
+  });
+
+  const handleQuickVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await api.post("/verification/quick-verify", {
+        identifier: regNumber,
+      });
+      setResult(res.data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Verification failed";
+      alert(msg);
+    }
+  };
+
+  const handleDetailedVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await api.get(`/verification/vehicle/${regNumber}`);
+      setResult(res.data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Verification failed";
+      alert(msg);
+    }
+  };
+
+  const handlePersonVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await api.get(`/verification/person/${aadhaarOrDl}`);
+      setResult(res.data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Verification failed";
+      alert(msg);
+    }
+  };
+
+  const fetchTheftReports = async () => {
+    try {
+      const res = await api.get("/theft/reports");
+      setTheftReports(res.data);
+    } catch (err: unknown) {
+      console.error("Failed to fetch theft reports:", err);
+    }
+  };
+
+  const handleMarkRecovered = async (reportId: string) => {
+    try {
+      const recoveryInfo = recoveryData[reportId] || {};
+      await api.put(`/theft/reports/${reportId}/recover`, {
+        recoveryDate:
+          recoveryInfo.recoveryDate || new Date().toISOString().split("T")[0],
+        recoveryLocation: recoveryInfo.recoveryLocation,
+        remarks: recoveryInfo.remarks,
+      });
+      alert("Vehicle marked as recovered successfully!");
+      fetchTheftReports(); // Refresh list
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to mark as recovered";
+      alert(msg);
+    }
+  };
+
+  const [theftReportsLoaded, setTheftReportsLoaded] = useState(false);
+
+  const handleTheftReportsTabClick = () => {
+    if (!theftReportsLoaded) {
+      fetchTheftReports();
+      setTheftReportsLoaded(true);
+    }
+  };
+
+  return (
+    <div className="container">
+      <div className="navbar">
+        <div className="container">
+          <h2>BioChain RTO - Police Dashboard</h2>
+          <div className="nav-links">
+            <span className="role-badge role-police">POLICE</span>
+            <button
+              className="btn btn-primary"
+              onClick={() => navigate("/search")}
+            >
+              🔍 Search
+            </button>
+            <button
+              className="btn btn-success"
+              onClick={() => navigate("/analytics")}
+            >
+              📊 Analytics
+            </button>
+            <button
+              className="btn btn-danger"
+              onClick={() => {
+                logout();
+                navigate("/");
+              }}
+            >
+              Logout
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>Real-time Vehicle Verification</h3>
+
+        {/* Tab Navigation */}
+        <div className="tab-navigation">
+          <button
+            className={`tab-btn ${activeTab === "quickVerify" ? "active" : ""}`}
+            onClick={() => setActiveTab("quickVerify")}
+          >
+            Quick Verify
+          </button>
+          <button
+            className={`tab-btn ${
+              activeTab === "detailedVerify" ? "active" : ""
+            }`}
+            onClick={() => setActiveTab("detailedVerify")}
+          >
+            Detailed Verify
+          </button>
+          <button
+            className={`tab-btn ${
+              activeTab === "personVerify" ? "active" : ""
+            }`}
+            onClick={() => setActiveTab("personVerify")}
+          >
+            Person Verify
+          </button>
+          <button
+            className={`tab-btn ${
+              activeTab === "theftReports" ? "active" : ""
+            }`}
+            onClick={handleTheftReportsTabClick}
+          >
+            Theft Reports
+          </button>
+          <button
+            className={`tab-btn ${activeTab === "profile" ? "active" : ""}`}
+            onClick={() => setActiveTab("profile")}
+          >
+            Profile
+          </button>
+        </div>
+
+        {/* Quick Verify Form */}
+        {activeTab === "quickVerify" && (
+          <form onSubmit={handleQuickVerify}>
+            <div className="form-group">
+              <label>Registration Number</label>
+              <input
+                type="text"
+                value={regNumber}
+                onChange={(e) => setRegNumber(e.target.value)}
+                placeholder="Enter vehicle registration number"
+                required
+              />
+            </div>
+            <button type="submit" className="btn btn-primary">
+              Quick Verify
+            </button>
+          </form>
+        )}
+
+        {/* Detailed Verify Form */}
+        {activeTab === "detailedVerify" && (
+          <form onSubmit={handleDetailedVerify}>
+            <div className="form-group">
+              <label>Registration Number</label>
+              <input
+                type="text"
+                value={regNumber}
+                onChange={(e) => setRegNumber(e.target.value)}
+                placeholder="Enter vehicle registration number"
+                required
+              />
+            </div>
+            <button type="submit" className="btn btn-primary">
+              Detailed Verify
+            </button>
+          </form>
+        )}
+
+        {/* Person Verify Form */}
+        {activeTab === "personVerify" && (
+          <form onSubmit={handlePersonVerify}>
+            <div className="form-group">
+              <label>Aadhaar or DL Number</label>
+              <input
+                type="text"
+                value={aadhaarOrDl}
+                onChange={(e) => setAadhaarOrDl(e.target.value)}
+                placeholder="Enter Aadhaar or Driving License number"
+                required
+              />
+            </div>
+            <button type="submit" className="btn btn-primary">
+              Verify Person
+            </button>
+          </form>
+        )}
+
+        {/* Theft Reports Tab */}
+        {activeTab === "theftReports" && (
+          <div>
+            <h3>Theft Reports - Mark as Recovered</h3>
+            {theftReports.length === 0 ? (
+              <p
+                style={{ color: "#666", textAlign: "center", padding: "20px" }}
+              >
+                No theft reports found.
+              </p>
+            ) : (
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Vehicle</th>
+                    <th>FIR No</th>
+                    <th>Police Station</th>
+                    <th>Theft Date</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {theftReports.map((report) => (
+                    <tr key={report._id}>
+                      <td>{report.vehicle?.regNumber || "N/A"}</td>
+                      <td>{report.firNumber}</td>
+                      <td>{report.policeStation}</td>
+                      <td>
+                        {new Date(report.incidentDate).toLocaleDateString()}
+                      </td>
+                      <td>
+                        <span
+                          className={`status-${
+                            report.status === "recovered" ? "active" : "stolen"
+                          }`}
+                        >
+                          {report.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td>
+                        {report.status !== "recovered" && (
+                          <div>
+                            <input
+                              type="date"
+                              placeholder="Recovery Date"
+                              onChange={(e) =>
+                                setRecoveryData({
+                                  ...recoveryData,
+                                  [report._id]: {
+                                    ...recoveryData[report._id],
+                                    recoveryDate: e.target.value,
+                                  },
+                                })
+                              }
+                              style={{ marginRight: "5px", padding: "5px" }}
+                            />
+                            <input
+                              type="text"
+                              placeholder="Recovery Location"
+                              onChange={(e) =>
+                                setRecoveryData({
+                                  ...recoveryData,
+                                  [report._id]: {
+                                    ...recoveryData[report._id],
+                                    recoveryLocation: e.target.value,
+                                  },
+                                })
+                              }
+                              style={{
+                                marginRight: "5px",
+                                padding: "5px",
+                                width: "150px",
+                              }}
+                            />
+                            <button
+                              className="btn btn-success"
+                              onClick={() => handleMarkRecovered(report._id)}
+                            >
+                              Mark Recovered
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Results Display */}
+      {result && (
+        <div className="card">
+          {activeTab === "quickVerify" && result && "regNumber" in result && (
+            <div>
+              <h3>Quick Verification Result</h3>
+              <p>
+                <strong>Registration No:</strong> {result.regNumber}
+              </p>
+              <p>
+                <strong>Make & Model:</strong> {result.make} {result.model}
+              </p>
+              <p>
+                <strong>Year:</strong> {result.year}
+              </p>
+              <p>
+                <strong>Status:</strong>
+                <span
+                  className={
+                    result.status === "active"
+                      ? "status-active"
+                      : "status-blocked"
+                  }
+                >
+                  {result.status.toUpperCase()}
+                </span>
+              </p>
+              <p>
+                <strong>Stolen Status:</strong>
+                <span
+                  className={
+                    result.isStolen ? "status-stolen" : "status-not-stolen"
+                  }
+                >
+                  {result.isStolen ? "STOLEN" : "NOT STOLEN"}
+                </span>
+              </p>
+              {result.currentOwner && (
+                <p>
+                  <strong>Current Owner:</strong> {result.currentOwner.name}
+                </p>
+              )}
+            </div>
+          )}
+
+          {activeTab === "detailedVerify" &&
+            result &&
+            "chassisNumber" in result && (
+              <div>
+                <h3>Detailed Vehicle Information</h3>
+                <div className="row">
+                  <div className="col">
+                    <p>
+                      <strong>Registration No:</strong> {result.regNumber}
+                    </p>
+                    <p>
+                      <strong>Chassis No:</strong> {result.chassisNumber}
+                    </p>
+                    <p>
+                      <strong>Engine No:</strong> {result.engineNumber}
+                    </p>
+                    <p>
+                      <strong>Make:</strong> {result.make}
+                    </p>
+                    <p>
+                      <strong>Model:</strong> {result.model}
+                    </p>
+                    <p>
+                      <strong>Year:</strong> {result.year}
+                    </p>
+                  </div>
+                  <div className="col">
+                    <p>
+                      <strong>Status:</strong>
+                      <span
+                        className={
+                          result.status === "active"
+                            ? "status-active"
+                            : "status-blocked"
+                        }
+                      >
+                        {result.status.toUpperCase()}
+                      </span>
+                    </p>
+                    <p>
+                      <strong>Stolen:</strong>
+                      <span
+                        className={
+                          result.isStolen
+                            ? "status-stolen"
+                            : "status-not-stolen"
+                        }
+                      >
+                        {result.isStolen ? "YES" : "NO"}
+                      </span>
+                    </p>
+                    {result.theftReport && (
+                      <div>
+                        <p>
+                          <strong>Theft Details:</strong>
+                        </p>
+                        <p> • Status: {result.theftReport.status}</p>
+                        <p> • Station: {result.theftReport.policeStation}</p>
+                        <p> • FIR: {result.theftReport.firNumber}</p>
+                        <p>
+                          {" "}
+                          • Date:{" "}
+                          {new Date(
+                            result.theftReport.incidentDate
+                          ).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {result.currentOwner && (
+                  <div>
+                    <h4>Current Owner</h4>
+                    <p>
+                      <strong>Name:</strong> {result.currentOwner.name}
+                    </p>
+                    <p>
+                      <strong>Aadhaar:</strong>{" "}
+                      {result.currentOwner.aadhaarNumber}
+                    </p>
+                    <p>
+                      <strong>DL:</strong> {result.currentOwner.dlNumber}
+                    </p>
+                  </div>
+                )}
+
+                <h4 style={{ marginTop: "20px" }}>Ownership History</h4>
+                <table className="table">
+                  <thead>
+                    <tr>
+                      <th>From</th>
+                      <th>To</th>
+                      <th>Type</th>
+                      <th>Date</th>
+                      <th>Blockchain Tx</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.ownershipHistory.map((record, index) => (
+                      <tr key={index}>
+                        <td>{record.from}</td>
+                        <td>{record.to}</td>
+                        <td>{record.transferType}</td>
+                        <td>{new Date(record.date).toLocaleDateString()}</td>
+                        <td>
+                          {record.blockchainTxHash
+                            ? record.blockchainTxHash.substring(0, 10) + "..."
+                            : "N/A"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <h4 style={{ marginTop: "20px" }}>Blockchain Info</h4>
+                <p>
+                  <strong>Blockchain Owner:</strong>{" "}
+                  {result.blockchainOwner
+                    ? result.blockchainOwner.substring(0, 10) + "..."
+                    : "Not available"}
+                </p>
+                <p>
+                  <strong>Last Blockchain Tx:</strong>{" "}
+                  {result.blockchainTxHash
+                    ? result.blockchainTxHash.substring(0, 10) + "..."
+                    : "None"}
+                </p>
+              </div>
+            )}
+
+          {activeTab === "personVerify" && result && "person" in result && (
+            <div>
+              <h3>Person Information</h3>
+              <div className="row">
+                <div className="col">
+                  <p>
+                    <strong>Name:</strong> {result.person.name}
+                  </p>
+                  <p>
+                    <strong>Email:</strong> {result.person.email}
+                  </p>
+                  <p>
+                    <strong>Aadhaar:</strong> {result.person.aadhaarNumber}
+                  </p>
+                  <p>
+                    <strong>DL:</strong> {result.person.dlNumber}
+                  </p>
+                  <p>
+                    <strong>Role:</strong> {result.person.role}
+                  </p>
+                  <p>
+                    <strong>Verification Status:</strong>{" "}
+                    {result.person.verificationStatus}
+                  </p>
+                </div>
+              </div>
+
+              <h4 style={{ marginTop: "20px" }}>Owned Vehicles</h4>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Reg No</th>
+                    <th>Make & Model</th>
+                    <th>Year</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.vehicles.map((v) => (
+                    <tr key={v._id}>
+                      <td>{v.regNumber}</td>
+                      <td>
+                        {v.make} {v.model}
+                      </td>
+                      <td>{v.year}</td>
+                      <td>
+                        <span
+                          className={
+                            v.status === "active"
+                              ? "status-active"
+                              : "status-blocked"
+                          }
+                        >
+                          {v.status.toUpperCase()}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <h4 style={{ marginTop: "20px" }}>Ownership History</h4>
+              {result.ownershipHistories.map((history, index) => (
+                <div key={index} className="history-section">
+                  <h5>Vehicle: {history.regNumber}</h5>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>From</th>
+                        <th>To</th>
+                        <th>Date</th>
+                        <th>Type</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.history.map((record, idx) => (
+                        <tr key={idx}>
+                          <td>{record.from}</td>
+                          <td>{record.to}</td>
+                          <td>{new Date(record.date).toLocaleDateString()}</td>
+                          <td>{record.transferType}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "profile" && (
+        <div className="card">
+          <h3>My Profile</h3>
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              if (!user) return;
+              try {
+                await api.put(`/users/${user.id}`, profileData);
+                alert("Profile updated successfully!");
+              } catch (err: unknown) {
+                const msg =
+                  err instanceof Error
+                    ? err.message
+                    : "Failed to update profile";
+                alert(msg);
+              }
+            }}
+          >
+            <div className="row">
+              <div className="col">
+                <div className="form-group">
+                  <label>Full Name *</label>
+                  <input
+                    type="text"
+                    value={profileData.name}
+                    onChange={(e) =>
+                      setProfileData({ ...profileData, name: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Email *</label>
+                  <input
+                    type="email"
+                    value={profileData.email}
+                    onChange={(e) =>
+                      setProfileData({ ...profileData, email: e.target.value })
+                    }
+                    required
+                    disabled
+                  />
+                  <small style={{ color: "#666" }}>
+                    Email cannot be changed
+                  </small>
+                </div>
+                <div className="form-group">
+                  <label>Phone Number</label>
+                  <input
+                    type="tel"
+                    value={profileData.phone}
+                    onChange={(e) =>
+                      setProfileData({ ...profileData, phone: e.target.value })
+                    }
+                    placeholder="+91 9876543210"
+                  />
+                </div>
+              </div>
+              <div className="col">
+                <div className="form-group">
+                  <label>Address</label>
+                  <textarea
+                    value={profileData.address}
+                    onChange={(e) =>
+                      setProfileData({
+                        ...profileData,
+                        address: e.target.value,
+                      })
+                    }
+                    rows={3}
+                    placeholder="Enter your full address"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Aadhaar Number</label>
+                  <input
+                    type="text"
+                    value={profileData.aadhaarNumber}
+                    onChange={(e) =>
+                      setProfileData({
+                        ...profileData,
+                        aadhaarNumber: e.target.value,
+                      })
+                    }
+                    placeholder="XXXX-XXXX-XXXX"
+                    maxLength={12}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Driving License Number</label>
+                  <input
+                    type="text"
+                    value={profileData.dlNumber}
+                    onChange={(e) =>
+                      setProfileData({
+                        ...profileData,
+                        dlNumber: e.target.value,
+                      })
+                    }
+                    placeholder="DL Number"
+                  />
+                </div>
+              </div>
+            </div>
+            <button type="submit" className="btn btn-primary">
+              Save Profile
+            </button>
+          </form>
+        </div>
+      )}
+      <footer className="dashboard-footer">
+        <p>© 2026 BioChain RTO System • Digital India Initiative</p>
+      </footer>
+    </div>
+  );
+}

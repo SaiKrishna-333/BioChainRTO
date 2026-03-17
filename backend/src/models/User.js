@@ -1,0 +1,63 @@
+import mongoose from "mongoose";
+
+const userSchema = new mongoose.Schema(
+    {
+        name: { type: String, required: true },
+        email: { type: String, unique: true, required: true },
+        passwordHash: { type: String, required: true },
+        role: {
+            type: String,
+            enum: ["dealer", "owner", "rto", "police", "admin"],
+            required: true
+        },
+        phone: { type: String },
+        address: { type: String },
+        aadhaarNumber: { type: String, unique: true },
+        dlNumber: { type: String, unique: true },
+        fingerprintTemplateId: { type: String },
+        biometricData: { // Store additional biometric information
+            fingerprint: { type: String }, // Encrypted fingerprint template
+            iris: { type: String }, // Iris scan data
+            face: { type: String }, // Face recognition template
+            lastEnrolled: { type: Date }
+        },
+        blockchainWalletAddress: { type: String }, // User's blockchain wallet address
+        verificationStatus: {
+            type: String,
+            enum: ["unverified", "pending", "verified", "rejected"],
+            default: "unverified"
+        },
+        profilePhoto: {
+            data: Buffer,  // Store image as binary data
+            contentType: String  // Store MIME type (image/jpeg, image/png, etc.)
+        },
+        // Dealer-specific fields
+        dealerDetails: {
+            businessName: { type: String },
+            gstin: { type: String },
+            tin: { type: String },
+            showroomAddress: { type: String },
+            invoicePrefix: { type: String, default: "INV" },
+            phone: { type: String },
+            licenseNumber: { type: String }
+        },
+        // Decentralized Identifier (DID)
+        did: {
+            identifier: { type: String, unique: true, sparse: true },
+            biochainDid: { type: String, unique: true, sparse: true },
+            document: { type: Object }, // Full DID document
+            createdAt: { type: Date }
+        },
+        // DID credentials
+        credentials: [{
+            type: { type: String, enum: ["ownership", "transfer_auth", "rto_auth", "police_auth"] },
+            credentialId: { type: String },
+            issuedAt: { type: Date },
+            expiresAt: { type: Date },
+            data: { type: Object }
+        }]
+    },
+    { timestamps: true }
+);
+
+export const User = mongoose.model("User", userSchema);
