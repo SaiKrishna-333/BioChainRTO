@@ -86,6 +86,37 @@ router.post("/register", upload.single("profilePhoto"), async (req, res) => {
     }
 });
 
+// Public endpoint to update biometric after registration (no auth required)
+router.put("/register/:id/biometric", async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { templateId, quality } = req.body;
+
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Update biometric data with the captured template
+        user.fingerprintTemplateId = templateId;
+        user.biometricData = {
+            fingerprint: templateId,
+            lastEnrolled: new Date()
+        };
+
+        await user.save();
+
+        res.json({
+            message: "Biometric data updated successfully",
+            templateId: user.fingerprintTemplateId,
+            quality
+        });
+    } catch (err) {
+        console.error("update biometric error:", err.message);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
 router.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
@@ -272,6 +303,79 @@ router.get("/users/:id/photo", authRequired, async (req, res) => {
         res.send(user.profilePhoto.data);
     } catch (err) {
         console.error("get user photo error:", err.message);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// Update user biometric data
+router.put("/:id/biometric", authRequired, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { templateId, quality } = req.body;
+
+        // Verify user can only update their own biometric data
+        if (id !== req.user.id) {
+            return res.status(403).json({ message: "Unauthorized to update this biometric data" });
+        }
+
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Update biometric data
+        user.fingerprintTemplateId = templateId;
+        user.biometricData = {
+            fingerprint: templateId,
+            lastEnrolled: new Date()
+        };
+
+        await user.save();
+
+        res.json({
+            message: "Biometric data updated successfully",
+            templateId: user.fingerprintTemplateId,
+            quality
+        });
+    } catch (err) {
+        console.error("update biometric error:", err.message);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
+// Update user profile photo
+router.put("/:id/photo", authRequired, upload.single("profilePhoto"), async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Verify user can only update their own photo
+        if (id !== req.user.id) {
+            return res.status(403).json({ message: "Unauthorized to update this photo" });
+        }
+
+        if (!req.file) {
+            return res.status(400).json({ message: "No photo file provided" });
+        }
+
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Update profile photo
+        user.profilePhoto = {
+            data: req.file.buffer,
+            contentType: req.file.mimetype
+        };
+
+        await user.save();
+
+        res.json({
+            message: "Profile photo updated successfully",
+            hasProfilePhoto: true
+        });
+    } catch (err) {
+        console.error("update photo error:", err.message);
         res.status(500).json({ message: "Server error" });
     }
 });

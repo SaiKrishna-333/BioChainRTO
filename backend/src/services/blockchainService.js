@@ -58,22 +58,78 @@ setTimeout(() => {
 export const registerVehicleOnChain = async (regNumber, chassisNumber, engineNumber, make, model, year, ownerAddress) => {
     try {
         if (!contract) {
+            console.log("Contract not initialized, initializing now...");
             await initializeBlockchain();
         }
 
-        console.log(`Registering vehicle ${regNumber} for owner ${ownerAddress} on blockchain`);
+        if (!contract) {
+            throw new Error("Blockchain contract not initialized. Check CONTRACT_ADDRESS in .env");
+        }
 
-        // Call the registerNewVehicle function on the contract with all parameters
-        const tx = await contract.registerNewVehicle(regNumber, chassisNumber, engineNumber, make, model, year, ownerAddress);
+        console.log(`\n📝 Registering vehicle on blockchain:`);
+        console.log(`   Registration: ${regNumber}`);
+        console.log(`   Chassis: ${chassisNumber}`);
+        console.log(`   Engine: ${engineNumber}`);
+        console.log(`   Make/Model: ${make} ${model}`);
+        console.log(`   Year: ${year}`);
+        console.log(`   Owner: ${ownerAddress}`);
 
-        // Wait for the transaction to be mined
-        const receipt = await tx.wait();
+        // Retry logic - attempt transaction up to 3 times
+        let attempts = 0;
+        const maxAttempts = 3;
+        let lastError;
 
-        console.log(`Vehicle ${regNumber} registered successfully. Transaction hash: ${tx.hash}`);
+        while (attempts < maxAttempts) {
+            try {
+                attempts++;
+                console.log(`Attempt ${attempts}/${maxAttempts}...`);
 
-        return tx.hash;
+                // Call the registerNewVehicle function on the contract with all parameters
+                const tx = await contract.registerNewVehicle(
+                    regNumber,
+                    chassisNumber,
+                    engineNumber,
+                    make,
+                    model,
+                    parseInt(year) || 2024,
+                    ownerAddress
+                );
+
+                console.log(`Transaction submitted: ${tx.hash}`);
+                console.log(`Waiting for confirmation...`);
+
+                // Wait for the transaction to be mined
+                const receipt = await tx.wait();
+
+                console.log(`✅ Vehicle ${regNumber} registered successfully!`);
+                console.log(`   Block: ${receipt.blockNumber}`);
+                console.log(`   TX Hash: ${tx.hash}`);
+
+                return tx.hash;
+            } catch (attemptError) {
+                lastError = attemptError;
+                console.warn(`⚠️ Attempt ${attempts} failed:`, attemptError.message);
+
+                // If it's a nonce error, reinitialize provider
+                if (attemptError.message.includes('nonce') || attemptError.message.includes('replacement fee')) {
+                    console.log(`Reinitializing blockchain connection...`);
+                    await initializeBlockchain();
+                }
+
+                // Wait before retry (exponential backoff)
+                if (attempts < maxAttempts) {
+                    const waitTime = attempts * 1000;
+                    console.log(`Waiting ${waitTime}ms before retry...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                }
+            }
+        }
+
+        // All attempts failed
+        throw new Error(`Transaction failed after ${maxAttempts} attempts: ${lastError.message}`);
+
     } catch (error) {
-        console.error("Error registering vehicle on chain:", error.message);
+        console.error("❌ Final error registering vehicle on chain:", error.message);
         throw error;
     }
 };
@@ -81,32 +137,88 @@ export const registerVehicleOnChain = async (regNumber, chassisNumber, engineNum
 export const transferVehicleOnChain = async (regNumber, fromAddress, toAddress, reason = "purchase", biometricHash = "0x0000000000000000000000000000000000000000000000000000000000000000") => {
     try {
         if (!contract) {
+            console.log("Contract not initialized, initializing now...");
             await initializeBlockchain();
         }
 
-        console.log(`Transferring vehicle ${regNumber} from ${fromAddress} to ${toAddress} on blockchain`);
+        if (!contract) {
+            throw new Error("Blockchain contract not initialized. Check CONTRACT_ADDRESS in .env");
+        }
 
-        // Call the transferOwnership function on the contract
-        // Note: fromAddress is not passed - contract uses msg.sender automatically
-        const tx = await contract.transferOwnership(regNumber, toAddress, reason, biometricHash);
+        console.log(`\n Transferring vehicle ownership on blockchain:`);
+        console.log(`   Registration: ${regNumber}`);
+        console.log(`   From: ${fromAddress}`);
+        console.log(`   To: ${toAddress}`);
+        console.log(`   Reason: ${reason}`);
 
-        // Wait for the transaction to be mined
-        const receipt = await tx.wait();
+        // Retry logic - attempt transaction up to 3 times
+        let attempts = 0;
+        const maxAttempts = 3;
+        let lastError;
 
-        console.log(`Vehicle ${regNumber} transferred successfully. Transaction hash: ${tx.hash}`);
+        while (attempts < maxAttempts) {
+            try {
+                attempts++;
+                console.log(`Attempt ${attempts}/${maxAttempts}...`);
 
-        return tx.hash;
+                // Call the transferOwnership function on the contract
+                // Note: fromAddress is not passed - contract uses msg.sender automatically
+                const tx = await contract.transferOwnership(regNumber, toAddress, reason, biometricHash);
+
+                console.log(`Transaction submitted: ${tx.hash}`);
+                console.log(`Waiting for confirmation...`);
+
+                // Wait for the transaction to be mined
+                const receipt = await tx.wait();
+
+                console.log(`✅ Vehicle ${regNumber} transferred successfully!`);
+                console.log(`   Block: ${receipt.blockNumber}`);
+                console.log(`   TX Hash: ${tx.hash}`);
+
+                return tx.hash;
+            } catch (attemptError) {
+                lastError = attemptError;
+                console.warn(`⚠️ Attempt ${attempts} failed:`, attemptError.message);
+
+                // Handle specific smart contract errors (no retry for these)
+                if (attemptError.message.includes("Vehicle is stolen")) {
+                    console.error("❌ BLOCKED: Vehicle is reported as stolen");
+                    throw new Error("Vehicle is stolen - transfer blocked");
+                }
+                if (attemptError.message.includes("Vehicle is scrapped")) {
+                    console.error("❌ BLOCKED: Vehicle is scrapped");
+                    throw new Error("Vehicle is scrapped - transfer blocked");
+                }
+
+                // If it's a nonce error, reinitialize provider
+                if (attemptError.message.includes('nonce') || attemptError.message.includes('replacement fee')) {
+                    console.log(`Reinitializing blockchain connection...`);
+                    await initializeBlockchain();
+                }
+
+                // Wait before retry (exponential backoff)
+                if (attempts < maxAttempts) {
+                    const waitTime = attempts * 1000;
+                    console.log(`Waiting ${waitTime}ms before retry...`);
+                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                }
+            }
+        }
+
+        // All attempts failed
+        throw new Error(`Transaction failed after ${maxAttempts} attempts: ${lastError.message}`);
+
     } catch (error) {
         // Handle specific smart contract errors
         if (error.message.includes("Vehicle is stolen")) {
-            console.error("BLOCKED: Vehicle is reported as stolen");
-            throw new Error("ERROR - Vehicle is stolen, transfer BLOCKED");
+            console.error("❌ BLOCKED: Vehicle is reported as stolen");
+            throw new Error("Vehicle is stolen - transfer blocked");
         }
         if (error.message.includes("Vehicle is scrapped")) {
-            console.error("BLOCKED: Vehicle is scrapped");
-            throw new Error("ERROR - Vehicle is scrapped, transfer BLOCKED");
+            console.error("❌ BLOCKED: Vehicle is scrapped");
+            throw new Error("Vehicle is scrapped - transfer blocked");
         }
-        console.error("Error transferring vehicle on chain:", error.message);
+        console.error("❌ Final error transferring vehicle on chain:", error.message);
         throw error;
     }
 };

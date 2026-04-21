@@ -243,13 +243,22 @@ export default function RTODashboard() {
                       {req.status === "pending" && (
                         <>
                           {req.type === "newRegistration" && (
-                            <input
-                              type="text"
-                              placeholder="Reg Number"
-                              value={regNumber}
-                              onChange={(e) => setRegNumber(e.target.value)}
-                              style={{ width: "120px", marginRight: "10px" }}
-                            />
+                            <>
+                              <button
+                                className="btn btn-info"
+                                onClick={() => navigate(`/invoice/${req._id}`)}
+                                style={{ marginRight: "8px" }}
+                              >
+                                📄 View Invoice
+                              </button>
+                              <input
+                                type="text"
+                                placeholder="Reg Number"
+                                value={regNumber}
+                                onChange={(e) => setRegNumber(e.target.value)}
+                                style={{ width: "120px", marginRight: "10px" }}
+                              />
+                            </>
                           )}
                           <button
                             className="btn btn-success"
@@ -288,7 +297,7 @@ export default function RTODashboard() {
                           >
                             📄 RC Certificate
                           </button>
-                          {req.vehicle.blockchainTxHash && (
+                          {req.vehicle.blockchainTxHash ? (
                             <a
                               href={`https://amoy.polygonscan.com/tx/${req.vehicle.blockchainTxHash}`}
                               target="_blank"
@@ -301,7 +310,24 @@ export default function RTODashboard() {
                             >
                               🔗 View Blockchain Tx
                             </a>
-                          )}
+                          ) : req.status === "approved" ? (
+                            <span
+                              style={{
+                                padding: "8px 16px",
+                                background: "#ff9800",
+                                color: "white",
+                                borderRadius: "6px",
+                                fontSize: "12px",
+                                fontWeight: "bold",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "6px",
+                              }}
+                              title="Blockchain transaction pending - will be created when next available"
+                            >
+                              ⚠️ Blockchain Pending
+                            </span>
+                          ) : null}
                         </div>
                       )}
                     </td>

@@ -31,6 +31,8 @@ const userSchema = new mongoose.Schema(
             data: Buffer,  // Store image as binary data
             contentType: String  // Store MIME type (image/jpeg, image/png, etc.)
         },
+        // Police-specific fields
+        badgeNumber: { type: String }, // Police badge/ID number
         // Dealer-specific fields
         dealerDetails: {
             businessName: { type: String },
@@ -59,5 +61,10 @@ const userSchema = new mongoose.Schema(
     },
     { timestamps: true }
 );
+
+// Indexes for efficient queries
+userSchema.index({ email: 1 });
+userSchema.index({ role: 1 });
+userSchema.index({ badgeNumber: 1 }); // For police badge lookups
 
 export const User = mongoose.model("User", userSchema);

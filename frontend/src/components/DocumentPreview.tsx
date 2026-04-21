@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/useAuth";
 
 interface DocumentPreviewProps {
@@ -40,11 +40,7 @@ export default function DocumentPreview({
     "verified"
   );
 
-  useEffect(() => {
-    fetchDocumentPreview();
-  }, [vehicleId, documentId]);
-
-  const fetchDocumentPreview = async () => {
+  const fetchDocumentPreview = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get(
@@ -58,7 +54,11 @@ export default function DocumentPreview({
     } finally {
       setLoading(false);
     }
-  };
+  }, [api, vehicleId, documentId]);
+
+  useEffect(() => {
+    fetchDocumentPreview();
+  }, [fetchDocumentPreview]);
 
   const getDocumentIcon = (type: string) => {
     switch (type) {

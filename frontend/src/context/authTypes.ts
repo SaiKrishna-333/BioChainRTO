@@ -21,6 +21,7 @@ export interface User {
   address?: string | null;
   aadhaarNumber?: string | null;
   dlNumber?: string | null;
+  badgeNumber?: string | null; // For police
   hasProfilePhoto?: boolean;
   profilePhoto?: {
     data?: ArrayBuffer | null;

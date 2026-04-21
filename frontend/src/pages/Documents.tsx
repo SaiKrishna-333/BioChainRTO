@@ -1,3 +1,7 @@
+import { useState, useEffect, useCallback } from "react";
+import { useAuth } from "../context/useAuth";
+import { useNavigate } from "react-router-dom";
+
 interface RegistrationCertificate {
   id: string;
   regNumber: string;
@@ -15,6 +19,7 @@ interface TransferCertificate {
 interface Invoice {
   id: string;
   vehicle: string;
+  invoiceNumber: string;
   status: "approved" | "rejected" | "pending";
   date: string;
 }
@@ -25,11 +30,9 @@ interface UserDocuments {
   invoices: Invoice[];
 }
 
-import { useState, useEffect, useCallback } from "react";
-import { useAuth } from "../context/useAuth";
-
 const Documents = () => {
   const { api } = useAuth();
+  const navigate = useNavigate();
   const [documents, setDocuments] = useState<UserDocuments | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -196,6 +199,7 @@ const Documents = () => {
             <table className="table">
               <thead>
                 <tr>
+                  <th>Invoice No.</th>
                   <th>Vehicle</th>
                   <th>Status</th>
                   <th>Date</th>
@@ -205,6 +209,9 @@ const Documents = () => {
               <tbody>
                 {documents.invoices.map((invoice: Invoice) => (
                   <tr key={invoice.id}>
+                    <td>
+                      {invoice.invoiceNumber || invoice.id.substring(0, 8)}
+                    </td>
                     <td>{invoice.vehicle}</td>
                     <td>
                       <span
@@ -223,10 +230,17 @@ const Documents = () => {
                     <td>{new Date(invoice.date).toLocaleDateString()}</td>
                     <td>
                       <button
+                        className="btn btn-info"
+                        onClick={() => navigate(`/invoice/${invoice.id}`)}
+                        style={{ marginRight: "8px" }}
+                      >
+                        View Invoice
+                      </button>
+                      <button
                         className="btn btn-primary"
                         onClick={() => handleDownload("Invoice", invoice.id)}
                       >
-                        Download Invoice
+                        Download
                       </button>
                     </td>
                   </tr>

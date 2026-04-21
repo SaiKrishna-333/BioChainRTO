@@ -4,6 +4,9 @@ pragma solidity ^0.8.20;
 contract VehicleRegistry {
 
     enum VehicleStatus { Active, Stolen, Scrapped }
+    
+    // Admin address (deployer) - can approve transfers for testing
+    address public admin;
 
     struct TransferEvent {
         address from;
@@ -35,6 +38,10 @@ contract VehicleRegistry {
     event VehicleRegistered(string indexed regNumber, address indexed owner);
     event OwnershipTransferred(string indexed regNumber, address indexed from, address indexed to, string reason);
     event VehicleStatusChanged(string indexed regNumber, VehicleStatus status);
+    
+    constructor() {
+        admin = msg.sender;
+    }
 
     // Register new vehicle
     function registerNewVehicle(
@@ -81,7 +88,7 @@ contract VehicleRegistry {
         Vehicle storage vehicle = vehicles[regNumber];
 
         require(vehicle.exists, "Vehicle not registered");
-        require(msg.sender == vehicle.currentOwner, "Only owner can transfer");
+        require(msg.sender == vehicle.currentOwner || msg.sender == admin, "Only owner or admin can transfer");
         require(to != address(0), "Invalid new owner");
         require(vehicle.status == VehicleStatus.Active, "Vehicle transfer blocked");
 

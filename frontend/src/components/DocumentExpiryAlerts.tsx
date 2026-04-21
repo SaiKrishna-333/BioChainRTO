@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/useAuth";
 
 interface ExpiryAlert {
@@ -18,11 +18,7 @@ export default function DocumentExpiryAlerts() {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(true);
 
-  useEffect(() => {
-    fetchAlerts();
-  }, []);
-
-  const fetchAlerts = async () => {
+  const fetchAlerts = useCallback(async () => {
     try {
       setLoading(true);
       const res = await api.get("/documents-mgmt/expiry-alerts");
@@ -32,7 +28,11 @@ export default function DocumentExpiryAlerts() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [api]);
+
+  useEffect(() => {
+    fetchAlerts();
+  }, [fetchAlerts]);
 
   const getDocumentIcon = (type: string) => {
     switch (type) {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/useAuth";
 import { useNavigate } from "react-router-dom";
+import DualBiometricVerification from "../components/DualBiometricVerification";
 
 export default function DealerDashboard() {
   const { user, logout, api } = useAuth();
@@ -56,11 +57,37 @@ export default function DealerDashboard() {
       model: "",
       year: "",
     },
+    exShowroomPrice: 0,
+    roadTax: 0,
+    registrationFee: 500,
+    insuranceAmount: 0,
+    handlingCharges: 5000,
+    otherCharges: 0,
+    paymentMode: "Full Payment",
   });
   const [regNumber, setRegNumber] = useState("");
   const [verificationResult, setVerificationResult] =
     useState<VerificationResult | null>(null);
   const [activeTab, setActiveTab] = useState("actions"); // 'actions', 'verification'
+  const [showBiometricVerification, setShowBiometricVerification] =
+    useState(false);
+  const [pendingRequest, setPendingRequest] = useState<{
+    buyerEmail: string;
+    vehicleDetails: {
+      chassisNumber: string;
+      engineNumber: string;
+      make: string;
+      model: string;
+      year: string;
+    };
+    exShowroomPrice: number;
+    roadTax: number;
+    registrationFee: number;
+    insuranceAmount: number;
+    handlingCharges: number;
+    otherCharges: number;
+    paymentMode: string;
+  } | null>(null);
 
   // Initialize dealer details from user context
   const initialDealerDetails = (): DealerDetails => {
@@ -121,8 +148,8 @@ export default function DealerDashboard() {
       const res = await api.get("/requests/all");
       setRequests(
         res.data.filter(
-          (r: { dealer?: { _id: string } }) => r.dealer?._id === user!.id
-        )
+          (r: { dealer?: { _id: string } }) => r.dealer?._id === user!.id,
+        ),
       );
     } catch (err: unknown) {
       console.error(err);
@@ -130,7 +157,7 @@ export default function DealerDashboard() {
   };
 
   const handleDealerDetailsChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
     const { name, value } = e.target;
     setDealerDetails({
@@ -174,7 +201,9 @@ export default function DealerDashboard() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
+  ) => {
     const { name, value } = e.target;
     if (name.includes("vehicleDetails")) {
       const field = name.split(".")[1];
@@ -189,11 +218,31 @@ export default function DealerDashboard() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Store the form data and show biometric verification
+    setPendingRequest(formData);
+    setShowBiometricVerification(true);
+  };
+
+  const handleBiometricSuccess = async () => {
+    if (!pendingRequest) return;
+
     try {
-      await api.post("/requests/new-registration", formData);
-      alert("Registration request submitted!");
+      const response = await api.post(
+        "/requests/new-registration",
+        pendingRequest,
+      );
+      const { requestId, invoiceNumber } = response.data;
+
+      // Show success with invoice link
+      const viewInvoice = window.confirm(
+        `Registration request submitted!\n\nInvoice: ${invoiceNumber}\n\nWould you like to view/print the invoice?`,
+      );
+
       setShowForm(false);
       setFormType("");
+      setShowBiometricVerification(false);
+      setPendingRequest(null);
       setFormData({
         buyerEmail: "",
         vehicleDetails: {
@@ -203,8 +252,19 @@ export default function DealerDashboard() {
           model: "",
           year: "",
         },
+        exShowroomPrice: 0,
+        roadTax: 0,
+        registrationFee: 500,
+        insuranceAmount: 0,
+        handlingCharges: 5000,
+        otherCharges: 0,
+        paymentMode: "Full Payment",
       });
       fetchRequests();
+
+      if (viewInvoice && requestId) {
+        navigate(`/invoice/${requestId}`);
+      }
     } catch {
       alert("Error submitting request");
     }
@@ -274,6 +334,21 @@ export default function DealerDashboard() {
                 Register New Vehicle
               </button>
             </div>
+
+            {/* Dual Biometric Verification Modal */}
+            <DualBiometricVerification
+              isOpen={showBiometricVerification}
+              onClose={() => {
+                setShowBiometricVerification(false);
+                setPendingRequest(null);
+              }}
+              onSuccess={handleBiometricSuccess}
+              person1Name={user?.name || "Dealer"}
+              person1Role="dealer"
+              person2Name="Buyer"
+              person2Role="owner"
+              transactionType="vehicle-sale"
+            />
           </div>
         )}
 
@@ -498,6 +573,80 @@ export default function DealerDashboard() {
                 required
               />
             </div>
+            <h5 style={{ marginTop: "20px", marginBottom: "15px" }}>
+              Pricing Details
+            </h5>
+            <div className="form-group">
+              <label>Ex-Showroom Price (₹)</label>
+              <input
+                type="number"
+                name="exShowroomPrice"
+                value={formData.exShowroomPrice}
+                onChange={handleChange}
+                placeholder="e.g., 800000"
+                required
+              />
+              <small>Base price of the vehicle before taxes</small>
+            </div>
+            <div className="form-group">
+              <label>Road Tax (₹)</label>
+              <input
+                type="number"
+                name="roadTax"
+                value={formData.roadTax}
+                onChange={handleChange}
+                placeholder="e.g., 48000"
+                required
+              />
+              <small>State road tax (typically 6% of ex-showroom price)</small>
+            </div>
+            <div className="form-group">
+              <label>Insurance Amount (₹)</label>
+              <input
+                type="number"
+                name="insuranceAmount"
+                value={formData.insuranceAmount}
+                onChange={handleChange}
+                placeholder="e.g., 32000"
+                required
+              />
+              <small>Annual insurance premium</small>
+            </div>
+            <div className="form-group">
+              <label>Handling Charges (₹)</label>
+              <input
+                type="number"
+                name="handlingCharges"
+                value={formData.handlingCharges}
+                onChange={handleChange}
+                placeholder="e.g., 5000"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Other Charges (₹)</label>
+              <input
+                type="number"
+                name="otherCharges"
+                value={formData.otherCharges}
+                onChange={handleChange}
+                placeholder="e.g., 0"
+              />
+              <small>Any additional charges (optional)</small>
+            </div>
+            <div className="form-group">
+              <label>Payment Mode</label>
+              <select
+                name="paymentMode"
+                value={formData.paymentMode}
+                onChange={handleChange}
+                required
+              >
+                <option value="Full Payment">Full Payment</option>
+                <option value="Loan">Loan/Financing</option>
+                <option value="Exchange">Exchange + Payment</option>
+              </select>
+            </div>
             <button type="submit" className="btn btn-success">
               Submit Request
             </button>
@@ -521,6 +670,7 @@ export default function DealerDashboard() {
               <th>Buyer</th>
               <th>Status</th>
               <th>Date</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -536,14 +686,22 @@ export default function DealerDashboard() {
                       req.status === "approved"
                         ? "role-rto"
                         : req.status === "rejected"
-                        ? "role-police"
-                        : "role-owner"
+                          ? "role-police"
+                          : "role-owner"
                     }`}
                   >
                     {req.status}
                   </span>
                 </td>
                 <td>{new Date(req.createdAt).toLocaleDateString()}</td>
+                <td>
+                  <button
+                    className="btn btn-info"
+                    onClick={() => navigate(`/invoice/${req._id}`)}
+                  >
+                    📄 Invoice
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

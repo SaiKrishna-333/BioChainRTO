@@ -176,4 +176,62 @@ router.get("/history/:regNumber", authRequired, async (req, res) => {
     }
 });
 
+// Re-sync vehicle to blockchain (for vehicles approved before contract fix)
+router.post("/:id/sync-blockchain", authRequired, requireRole("rto"), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const vehicle = await Vehicle.findById(id).populate("currentOwner");
+
+        if (!vehicle) {
+            return res.status(404).json({ message: "Vehicle not found" });
+        }
+
+        console.log(`\n🔄 SYNCING VEHICLE TO BLOCKCHAIN: ${vehicle.regNumber}`);
+        console.log(`   Owner: ${vehicle.currentOwner?.name}`);
+
+        // Import blockchain service
+        const { registerVehicleOnChain } = await import("../services/blockchainService.js");
+
+        // Get owner address
+        let ownerAddress;
+        if (vehicle.currentOwner?.blockchainWalletAddress) {
+            ownerAddress = vehicle.currentOwner.blockchainWalletAddress;
+        } else {
+            // Use admin wallet as fallback for now
+            ownerAddress = "0xF7167C4089CA6e6374D9B42dE09b97DC416cF725";
+        }
+
+        console.log(`   Owner Address: ${ownerAddress}`);
+        console.log(`   Registering on blockchain...`);
+
+        // Register on blockchain
+        const txHash = await registerVehicleOnChain(
+            vehicle.regNumber,
+            vehicle.chassisNumber,
+            vehicle.engineNumber,
+            vehicle.make,
+            vehicle.model,
+            parseInt(vehicle.year) || 2024,
+            ownerAddress
+        );
+
+        console.log(`   ✅ Transaction successful: ${txHash}`);
+
+        // Update vehicle with blockchain TX hash
+        vehicle.blockchainTxHash = txHash;
+        await vehicle.save();
+
+        res.json({
+            message: "Vehicle synced to blockchain successfully",
+            blockchainTxHash: txHash
+        });
+    } catch (err) {
+        console.error("Sync blockchain error:", err.message);
+        res.status(500).json({
+            message: "Failed to sync to blockchain",
+            error: err.message
+        });
+    }
+});
+
 export default router;

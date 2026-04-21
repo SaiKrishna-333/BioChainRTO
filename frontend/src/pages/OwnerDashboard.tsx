@@ -9,6 +9,7 @@ interface VehicleHistoryRecord {
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../context/useAuth";
 import { useNavigate } from "react-router-dom";
+import DualBiometricVerification from "../components/DualBiometricVerification";
 import DocumentExpiryAlerts from "../components/DocumentExpiryAlerts";
 
 import type { Vehicle } from "../types/api";
@@ -29,8 +30,17 @@ export default function OwnerDashboard() {
   const [vehicleHistory, setVehicleHistory] = useState<{
     [key: string]: VehicleHistoryRecord[];
   }>({});
+  const [invoices, setInvoices] = useState<
+    Array<{
+      _id: string;
+      invoiceNumber: string;
+      vehicle: { make: string; model: string; regNumber: string };
+      status: string;
+      createdAt: string;
+    }>
+  >([]);
   const [showForm, setShowForm] = useState(false);
-  const [activeTab, setActiveTab] = useState("myVehicles"); // 'myVehicles', 'history', 'theft', 'profile'
+  const [activeTab, setActiveTab] = useState("myVehicles"); // 'myVehicles', 'history', 'theft', 'profile', 'invoices'
   const [formData, setFormData] = useState({
     vehicleId: "",
     buyerEmail: "",
@@ -68,6 +78,13 @@ export default function OwnerDashboard() {
   });
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string>("");
+  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
+  const [showBiometricVerification, setShowBiometricVerification] =
+    useState(false);
+  const [pendingTransfer, setPendingTransfer] = useState<{
+    vehicleId: string;
+    buyerEmail: string;
+  } | null>(null);
 
   const loadProfileData = useCallback(async () => {
     // Load from user context (which has data from login)
@@ -107,9 +124,23 @@ export default function OwnerDashboard() {
     e.preventDefault();
     if (!user) return;
     try {
+      // If there's a new photo, upload it first
+      if (profilePhotoFile) {
+        const formData = new FormData();
+        formData.append("profilePhoto", profilePhotoFile);
+
+        await api.put(`/users/${user.id}/photo`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        });
+      }
+
+      // Update other profile data
       await api.put(`/users/${user.id}`, profileData);
       alert("Profile updated successfully!");
       setIsEditingProfile(false);
+      setProfilePhotoFile(null);
       loadProfileData();
     } catch (err: unknown) {
       const msg =
@@ -127,6 +158,15 @@ export default function OwnerDashboard() {
     }
   }, [api]);
 
+  const fetchInvoices = useCallback(async () => {
+    try {
+      const res = await api.get("/requests/my-invoices");
+      setInvoices(res.data);
+    } catch (err: unknown) {
+      console.error("Error fetching invoices:", err);
+    }
+  }, [api]);
+
   const fetchVehicleHistory = async (vehicleId: string, regNumber: string) => {
     try {
       const res = await api.get(`/vehicles/history/${regNumber}`);
@@ -141,7 +181,7 @@ export default function OwnerDashboard() {
   };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
@@ -149,13 +189,13 @@ export default function OwnerDashboard() {
   const handleTheftChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    >,
   ) => {
     setTheftFormData({ ...theftFormData, [e.target.name]: e.target.value });
   };
 
   const handleInheritanceChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
   ) => {
     setInheritanceFormData({
       ...inheritanceFormData,
@@ -175,10 +215,21 @@ export default function OwnerDashboard() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Store the transfer data and show biometric verification
+    setPendingTransfer(formData);
+    setShowBiometricVerification(true);
+  };
+
+  const handleBiometricSuccess = async () => {
+    if (!pendingTransfer) return;
+
     try {
-      await api.post("/requests/transfer", formData);
-      alert("Transfer request submitted!");
+      await api.post("/requests/transfer", pendingTransfer);
+      alert("Transfer request submitted with biometric verification!");
       setShowForm(false);
+      setShowBiometricVerification(false);
+      setPendingTransfer(null);
       setFormData({ vehicleId: "", buyerEmail: "" });
       fetchVehicles();
     } catch (err: unknown) {
@@ -186,7 +237,7 @@ export default function OwnerDashboard() {
       alert(
         "Error submitting request: " +
           (err as { response?: { data?: { message?: string } } })?.response
-            ?.data?.message || errorMessage
+            ?.data?.message || errorMessage,
       );
     }
   };
@@ -211,7 +262,7 @@ export default function OwnerDashboard() {
       alert(
         "Error submitting theft report: " +
           (err as { response?: { data?: { message?: string } } })?.response
-            ?.data?.message || errorMessage
+            ?.data?.message || errorMessage,
       );
     }
   };
@@ -225,15 +276,15 @@ export default function OwnerDashboard() {
       formData.append("deceasedOwnerId", inheritanceFormData.deceasedOwnerId);
       formData.append(
         "deathCertificateNumber",
-        inheritanceFormData.deathCertificateNumber
+        inheritanceFormData.deathCertificateNumber,
       );
       formData.append(
         "relationshipToDeceased",
-        inheritanceFormData.relationshipToDeceased
+        inheritanceFormData.relationshipToDeceased,
       );
       formData.append(
         "successionCertificateNumber",
-        inheritanceFormData.successionCertificateNumber
+        inheritanceFormData.successionCertificateNumber,
       );
       formData.append("courtOrderNumber", inheritanceFormData.courtOrderNumber);
 
@@ -241,13 +292,13 @@ export default function OwnerDashboard() {
       if (inheritanceFormData.deathCertificateDoc) {
         formData.append(
           "deathCertificate",
-          inheritanceFormData.deathCertificateDoc
+          inheritanceFormData.deathCertificateDoc,
         );
       }
       if (inheritanceFormData.successionCertificateDoc) {
         formData.append(
           "successionCertificate",
-          inheritanceFormData.successionCertificateDoc
+          inheritanceFormData.successionCertificateDoc,
         );
       }
       if (inheritanceFormData.courtOrderDoc) {
@@ -256,7 +307,7 @@ export default function OwnerDashboard() {
       if (inheritanceFormData.relationshipProofDoc) {
         formData.append(
           "relationshipProof",
-          inheritanceFormData.relationshipProofDoc
+          inheritanceFormData.relationshipProofDoc,
         );
       }
 
@@ -285,7 +336,7 @@ export default function OwnerDashboard() {
       alert(
         "Error submitting inheritance request: " +
           (err as { response?: { data?: { message?: string } } })?.response
-            ?.data?.message || errorMessage
+            ?.data?.message || errorMessage,
       );
     }
   };
@@ -299,9 +350,10 @@ export default function OwnerDashboard() {
     const loadData = async () => {
       await fetchVehicles();
       await loadProfileData();
+      await fetchInvoices();
     };
     loadData();
-  }, [user, navigate, fetchVehicles, loadProfileData]);
+  }, [user, navigate, fetchVehicles, loadProfileData, fetchInvoices]);
 
   return (
     <div className="container">
@@ -348,6 +400,12 @@ export default function OwnerDashboard() {
             onClick={() => setActiveTab("inheritance")}
           >
             Inheritance Transfer
+          </button>
+          <button
+            className={`tab-btn ${activeTab === "invoices" ? "active" : ""}`}
+            onClick={() => setActiveTab("invoices")}
+          >
+            My Invoices
           </button>
           <button
             className={`tab-btn ${activeTab === "profile" ? "active" : ""}`}
@@ -410,11 +468,11 @@ export default function OwnerDashboard() {
                           if (v.blockchainTxHash) {
                             window.open(
                               `https://amoy.polygonscan.com/tx/${v.blockchainTxHash}`,
-                              "_blank"
+                              "_blank",
                             );
                           } else {
                             alert(
-                              "Blockchain registration pending. This vehicle hasn't been registered on blockchain yet."
+                              "Blockchain registration pending. This vehicle hasn't been registered on blockchain yet.",
                             );
                           }
                         }}
@@ -487,7 +545,7 @@ export default function OwnerDashboard() {
                                 <td>{record.transferType || "transfer"}</td>
                                 <td>
                                   {new Date(
-                                    record.timestamp
+                                    record.timestamp,
                                   ).toLocaleDateString()}
                                 </td>
                                 <td>
@@ -497,12 +555,12 @@ export default function OwnerDashboard() {
                                     : "N/A"}
                                 </td>
                               </tr>
-                            )
+                            ),
                           )}
                         </tbody>
                       </table>
                     </div>
-                  )
+                  ),
                 )}
               </div>
             )}
@@ -773,6 +831,65 @@ export default function OwnerDashboard() {
         )}
       </div>
 
+      {/* Invoices Tab */}
+      {activeTab === "invoices" && (
+        <div className="card">
+          <h3>My Invoices</h3>
+          {invoices && invoices.length > 0 ? (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Invoice No.</th>
+                  <th>Vehicle</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map((invoice) => (
+                  <tr key={invoice._id}>
+                    <td>{invoice.invoiceNumber}</td>
+                    <td>
+                      {invoice.vehicle?.make} {invoice.vehicle?.model}
+                      {invoice.vehicle?.regNumber &&
+                        ` (${invoice.vehicle.regNumber})`}
+                    </td>
+                    <td>
+                      <span
+                        className={`role-badge ${
+                          invoice.status === "approved"
+                            ? "role-rto"
+                            : invoice.status === "rejected"
+                              ? "role-police"
+                              : "role-owner"
+                        }`}
+                      >
+                        {invoice.status.toUpperCase()}
+                      </span>
+                    </td>
+                    <td>{new Date(invoice.createdAt).toLocaleDateString()}</td>
+                    <td>
+                      <button
+                        className="btn btn-info"
+                        onClick={() => navigate(`/invoice/${invoice._id}`)}
+                      >
+                        View Invoice
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p>
+              No invoices found. Your vehicle purchase invoices will appear here
+              after registration.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Profile Tab */}
       {activeTab === "profile" && (
         <div className="card">
@@ -810,6 +927,49 @@ export default function OwnerDashboard() {
             ) : (
               <div className="profile-photo-placeholder">
                 {profileData.name.charAt(0).toUpperCase()}
+              </div>
+            )}
+            {isEditingProfile && (
+              <div style={{ marginTop: "15px", textAlign: "center" }}>
+                <label
+                  style={{
+                    display: "inline-block",
+                    padding: "8px 16px",
+                    background: "#00D4FF",
+                    color: "#0B1120",
+                    borderRadius: "6px",
+                    cursor: "pointer",
+                    fontWeight: "600",
+                    fontSize: "0.85rem",
+                  }}
+                >
+                  📷 Change Photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setProfilePhotoFile(file);
+                        // Show preview
+                        const previewUrl = URL.createObjectURL(file);
+                        setProfilePhotoUrl(previewUrl);
+                      }
+                    }}
+                  />
+                </label>
+                {profilePhotoFile && (
+                  <p
+                    style={{
+                      color: "#10B981",
+                      fontSize: "0.8rem",
+                      marginTop: "5px",
+                    }}
+                  >
+                    ✓ New photo selected: {profilePhotoFile.name}
+                  </p>
+                )}
               </div>
             )}
           </div>
@@ -877,37 +1037,39 @@ export default function OwnerDashboard() {
                   />
                 </div>
                 <div className="form-group">
-                  <label>Aadhaar Number</label>
+                  <label>Aadhaar Number 🔒</label>
                   <input
                     type="text"
                     name="aadhaarNumber"
                     value={profileData.aadhaarNumber}
-                    onChange={(e) =>
-                      setProfileData({
-                        ...profileData,
-                        aadhaarNumber: e.target.value,
-                      })
-                    }
                     placeholder="XXXX-XXXX-XXXX"
                     maxLength={12}
-                    disabled={!isEditingProfile}
+                    disabled={true}
+                    style={{
+                      backgroundColor: "#f5f5f5",
+                      cursor: "not-allowed",
+                    }}
                   />
+                  <small style={{ color: "#d32f2f", fontWeight: "bold" }}>
+                    ⚠️ Aadhaar number cannot be changed for security reasons
+                  </small>
                 </div>
                 <div className="form-group">
-                  <label>Driving License Number</label>
+                  <label>Driving License Number 🔒</label>
                   <input
                     type="text"
                     name="dlNumber"
                     value={profileData.dlNumber}
-                    onChange={(e) =>
-                      setProfileData({
-                        ...profileData,
-                        dlNumber: e.target.value,
-                      })
-                    }
                     placeholder="DL Number"
-                    disabled={!isEditingProfile}
+                    disabled={true}
+                    style={{
+                      backgroundColor: "#f5f5f5",
+                      cursor: "not-allowed",
+                    }}
                   />
+                  <small style={{ color: "#d32f2f", fontWeight: "bold" }}>
+                    ⚠️ DL number cannot be changed for security reasons
+                  </small>
                 </div>
               </div>
             </div>
@@ -950,6 +1112,21 @@ export default function OwnerDashboard() {
       <footer className="dashboard-footer">
         <p>© 2026 BioChain RTO System • Digital India Initiative</p>
       </footer>
+
+      {/* Dual Biometric Verification Modal */}
+      <DualBiometricVerification
+        isOpen={showBiometricVerification}
+        onClose={() => {
+          setShowBiometricVerification(false);
+          setPendingTransfer(null);
+        }}
+        onSuccess={handleBiometricSuccess}
+        person1Name={user?.name || "Seller"}
+        person1Role="owner"
+        person2Name="Buyer"
+        person2Role="owner"
+        transactionType="ownership-transfer"
+      />
     </div>
   );
 }

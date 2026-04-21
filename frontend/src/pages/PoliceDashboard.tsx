@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/useAuth";
 import { useNavigate } from "react-router-dom";
+import ChallanManagement from "../components/ChallanManagement";
 
 import type {
   QuickVerifyResult,
@@ -26,7 +27,7 @@ export default function PoliceDashboard() {
     | null;
 
   const [result, setResult] = useState<VerificationResult>(null);
-  const [activeTab, setActiveTab] = useState("quickVerify"); // 'quickVerify', 'detailedVerify', 'personVerify', 'theftReports', 'profile'
+  const [activeTab, setActiveTab] = useState("quickVerify"); // 'quickVerify', 'detailedVerify', 'personVerify', 'theftReports', 'challans', 'profile'
   const [theftReports, setTheftReports] = useState<TheftReportAdmin[]>([]);
   const [recoveryData, setRecoveryData] = useState<{
     [key: string]: {
@@ -35,6 +36,9 @@ export default function PoliceDashboard() {
       remarks?: string;
     };
   }>({});
+  const [showRecoveryModal, setShowRecoveryModal] = useState<string | null>(
+    null
+  );
   const [profileData, setProfileData] = useState({
     name: "",
     email: "",
@@ -42,6 +46,7 @@ export default function PoliceDashboard() {
     address: "",
     aadhaarNumber: "",
     dlNumber: "",
+    badgeNumber: "",
   });
 
   const handleQuickVerify = async (e: React.FormEvent) => {
@@ -98,6 +103,7 @@ export default function PoliceDashboard() {
         remarks: recoveryInfo.remarks,
       });
       alert("Vehicle marked as recovered successfully!");
+      setShowRecoveryModal(null);
       fetchTheftReports(); // Refresh list
     } catch (err: unknown) {
       const msg =
@@ -106,9 +112,24 @@ export default function PoliceDashboard() {
     }
   };
 
+  const loadProfileData = () => {
+    if (user) {
+      setProfileData({
+        name: user.name || "",
+        email: user.email || "",
+        phone: user.phone || "",
+        address: user.address || "",
+        aadhaarNumber: user.aadhaarNumber || "",
+        dlNumber: user.dlNumber || "",
+        badgeNumber: user.badgeNumber || "",
+      });
+    }
+  };
+
   const [theftReportsLoaded, setTheftReportsLoaded] = useState(false);
 
   const handleTheftReportsTabClick = () => {
+    setActiveTab("theftReports");
     if (!theftReportsLoaded) {
       fetchTheftReports();
       setTheftReportsLoaded(true);
@@ -183,8 +204,17 @@ export default function PoliceDashboard() {
             Theft Reports
           </button>
           <button
+            className={`tab-btn ${activeTab === "challans" ? "active" : ""}`}
+            onClick={() => setActiveTab("challans")}
+          >
+            Traffic Challans
+          </button>
+          <button
             className={`tab-btn ${activeTab === "profile" ? "active" : ""}`}
-            onClick={() => setActiveTab("profile")}
+            onClick={() => {
+              setActiveTab("profile");
+              loadProfileData();
+            }}
           >
             Profile
           </button>
@@ -288,47 +318,29 @@ export default function PoliceDashboard() {
                         </span>
                       </td>
                       <td>
-                        {report.status !== "recovered" && (
-                          <div>
-                            <input
-                              type="date"
-                              placeholder="Recovery Date"
-                              onChange={(e) =>
-                                setRecoveryData({
-                                  ...recoveryData,
-                                  [report._id]: {
-                                    ...recoveryData[report._id],
-                                    recoveryDate: e.target.value,
-                                  },
-                                })
-                              }
-                              style={{ marginRight: "5px", padding: "5px" }}
-                            />
-                            <input
-                              type="text"
-                              placeholder="Recovery Location"
-                              onChange={(e) =>
-                                setRecoveryData({
-                                  ...recoveryData,
-                                  [report._id]: {
-                                    ...recoveryData[report._id],
-                                    recoveryLocation: e.target.value,
-                                  },
-                                })
-                              }
-                              style={{
-                                marginRight: "5px",
-                                padding: "5px",
-                                width: "150px",
-                              }}
-                            />
+                        {report.status !== "recovered" ? (
+                          <div
+                            style={{
+                              display: "flex",
+                              gap: "5px",
+                              alignItems: "center",
+                            }}
+                          >
                             <button
                               className="btn btn-success"
-                              onClick={() => handleMarkRecovered(report._id)}
+                              onClick={() => setShowRecoveryModal(report._id)}
+                              title="Mark as Recovered"
                             >
-                              Mark Recovered
+                              ✅ Mark Recovered
                             </button>
                           </div>
+                        ) : (
+                          <span
+                            className="status-active"
+                            style={{ color: "#28a745", fontWeight: "bold" }}
+                          >
+                            ✓ RECOVERED
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -711,6 +723,20 @@ export default function PoliceDashboard() {
                     placeholder="DL Number"
                   />
                 </div>
+                <div className="form-group">
+                  <label>Badge Number (Police ID)</label>
+                  <input
+                    type="text"
+                    value={profileData.badgeNumber}
+                    onChange={(e) =>
+                      setProfileData({
+                        ...profileData,
+                        badgeNumber: e.target.value,
+                      })
+                    }
+                    placeholder="Enter your badge number"
+                  />
+                </div>
               </div>
             </div>
             <button type="submit" className="btn btn-primary">
@@ -719,6 +745,113 @@ export default function PoliceDashboard() {
           </form>
         </div>
       )}
+
+      {/* Challans Tab */}
+      {activeTab === "challans" && (
+        <div>
+          <ChallanManagement />
+        </div>
+      )}
+
+      {/* Recovery Modal */}
+      {showRecoveryModal && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              maxWidth: "500px",
+              width: "90%",
+              maxHeight: "80vh",
+              overflow: "auto",
+            }}
+          >
+            <h3>Mark Vehicle as Recovered</h3>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleMarkRecovered(showRecoveryModal);
+              }}
+            >
+              <div className="form-group">
+                <label>Recovery Date</label>
+                <input
+                  type="date"
+                  defaultValue={new Date().toISOString().split("T")[0]}
+                  onChange={(e) =>
+                    setRecoveryData({
+                      ...recoveryData,
+                      [showRecoveryModal]: {
+                        ...recoveryData[showRecoveryModal],
+                        recoveryDate: e.target.value,
+                      },
+                    })
+                  }
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Recovery Location</label>
+                <input
+                  type="text"
+                  placeholder="Enter recovery location"
+                  onChange={(e) =>
+                    setRecoveryData({
+                      ...recoveryData,
+                      [showRecoveryModal]: {
+                        ...recoveryData[showRecoveryModal],
+                        recoveryLocation: e.target.value,
+                      },
+                    })
+                  }
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Remarks</label>
+                <textarea
+                  placeholder="Enter any additional remarks"
+                  rows={3}
+                  onChange={(e) =>
+                    setRecoveryData({
+                      ...recoveryData,
+                      [showRecoveryModal]: {
+                        ...recoveryData[showRecoveryModal],
+                        remarks: e.target.value,
+                      },
+                    })
+                  }
+                />
+              </div>
+              <div style={{ display: "flex", gap: "10px", marginTop: "20px" }}>
+                <button type="submit" className="btn btn-success">
+                  ✓ Mark as Recovered
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowRecoveryModal(null)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <footer className="dashboard-footer">
         <p>© 2026 BioChain RTO System • Digital India Initiative</p>
       </footer>

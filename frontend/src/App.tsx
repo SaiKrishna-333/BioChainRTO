@@ -10,6 +10,7 @@ import RTODashboard from "./pages/RTODashboard";
 import PoliceDashboard from "./pages/PoliceDashboard";
 import VehicleSearch from "./pages/VehicleSearch";
 import AnalyticsDashboard from "./pages/AnalyticsDashboard";
+import InvoiceView from "./pages/InvoiceView";
 import Documents from "./pages/Documents";
 import RCCardView from "./pages/RCCardView";
 import type { ReactNode } from "react";
@@ -253,6 +254,7 @@ const AppContent = () => {
         }
       />
       <Route path="/rc-card/:vehicleId" element={<RCCardView />} />
+      <Route path="/invoice/:requestId" element={<InvoiceView />} />
     </Routes>
   );
 };
