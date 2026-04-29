@@ -12,6 +12,19 @@ export interface Person {
   verificationStatus: string;
 }
 
+/* ========= RTO DETAILS ========= */
+export interface RTODetails {
+  stateCode: string;
+  stateName: string;
+  district: string;
+  rtoOfficeCode: string;
+  rtoOfficeName: string;
+  designation: string;
+  employeeId: string;
+  officeAddress: string;
+  jurisdiction: string;
+}
+
 /* ========= VEHICLE ========= */
 export interface Vehicle {
   _id: string;
@@ -124,6 +137,39 @@ export interface TheftReportAdmin {
   recoveryDate?: string;
   recoveryLocation?: string;
   remarks?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/* ========= INTER-STATE TRANSFER ========= */
+export interface InterStateTransferRequest {
+  _id: string;
+  type: string;
+  vehicle?: Vehicle;
+  seller?: Person;
+  status: string;
+  interStateDetails?: {
+    currentState: string;
+    targetState: string;
+    newAddress: string;
+    currentRegNumber: string;
+    newRegNumber: string;
+    sourceRTOApproval: {
+      status: string;
+      officerName: string;
+      rtoOffice: string;
+      timestamp: string;
+      remarks: string;
+    };
+    destinationRTOApproval: {
+      status: string;
+      officerName: string;
+      rtoOffice: string;
+      timestamp: string;
+      remarks: string;
+    };
+    transferInitiatedAt: string;
+  };
   createdAt?: string;
   updatedAt?: string;
 }

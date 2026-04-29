@@ -13,6 +13,11 @@ import AnalyticsDashboard from "./pages/AnalyticsDashboard";
 import InvoiceView from "./pages/InvoiceView";
 import Documents from "./pages/Documents";
 import RCCardView from "./pages/RCCardView";
+import RTOSetupPage from "./pages/RTOSetupPage";
+import RTOProfilePage from "./pages/RTOProfilePage";
+import OwnerProfilePage from "./pages/OwnerProfilePage";
+import DealerProfilePage from "./pages/DealerProfilePage";
+import PoliceProfilePage from "./pages/PoliceProfilePage";
 import type { ReactNode } from "react";
 
 interface ProtectedRouteProps {
@@ -198,6 +203,22 @@ const AppContent = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route
+        path="/owner"
+        element={
+          <ProtectedRoute allowedRoles={["owner"]}>
+            <OwnerDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/owner-profile"
+        element={
+          <ProtectedRoute allowedRoles={["owner"]}>
+            <OwnerProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/dealer"
         element={
           <ProtectedRoute allowedRoles={["dealer"]}>
@@ -206,10 +227,18 @@ const AppContent = () => {
         }
       />
       <Route
-        path="/owner"
+        path="/dealer-profile"
         element={
-          <ProtectedRoute allowedRoles={["owner"]}>
-            <OwnerDashboard />
+          <ProtectedRoute allowedRoles={["dealer"]}>
+            <DealerProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/rto-setup"
+        element={
+          <ProtectedRoute allowedRoles={["rto"]}>
+            <RTOSetupPage />
           </ProtectedRoute>
         }
       />
@@ -222,10 +251,26 @@ const AppContent = () => {
         }
       />
       <Route
+        path="/rto-profile"
+        element={
+          <ProtectedRoute allowedRoles={["rto"]}>
+            <RTOProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/police"
         element={
           <ProtectedRoute allowedRoles={["police"]}>
             <PoliceDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/police-profile"
+        element={
+          <ProtectedRoute allowedRoles={["police"]}>
+            <PoliceProfilePage />
           </ProtectedRoute>
         }
       />

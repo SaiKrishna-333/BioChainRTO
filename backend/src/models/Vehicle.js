@@ -20,9 +20,17 @@ const vehicleSchema = new mongoose.Schema(
         }],
         status: {
             type: String,
-            enum: ["active", "blocked", "stolen", "scrapped"],
+            enum: ["active", "blocked", "stolen", "scrapped", "registered", "transfer_pending", "under_investigation"],
             default: "active"
         },
+        lastStateChange: { type: Date },
+        stateChangeHistory: [{
+            from: { type: String },
+            to: { type: String },
+            reason: { type: String },
+            authorizedBy: { type: String },
+            timestamp: { type: Date, default: Date.now }
+        }],
         lastVerified: { type: Date },
         // IPFS document hashes for vehicle documents
         ipfsDocuments: {

@@ -12,6 +12,8 @@ const userSchema = new mongoose.Schema(
         },
         phone: { type: String },
         address: { type: String },
+        state: { type: String }, // User's state (KA, TN, AP, etc.) - for RTO routing
+        district: { type: String }, // User's district
         aadhaarNumber: { type: String, unique: true },
         dlNumber: { type: String, unique: true },
         fingerprintTemplateId: { type: String },
@@ -42,6 +44,18 @@ const userSchema = new mongoose.Schema(
             invoicePrefix: { type: String, default: "INV" },
             phone: { type: String },
             licenseNumber: { type: String }
+        },
+        // RTO-specific fields
+        rtoDetails: {
+            stateCode: { type: String }, // e.g., "KA", "TS", "AP"
+            stateName: { type: String }, // e.g., "Karnataka"
+            district: { type: String },
+            rtoOfficeCode: { type: String }, // e.g., "KA-01", "TS-07"
+            rtoOfficeName: { type: String }, // e.g., "Bangalore Central RTO"
+            designation: { type: String }, // e.g., "RTO Officer", "Assistant RTO"
+            employeeId: { type: String, unique: true },
+            officeAddress: { type: String },
+            jurisdiction: { type: String }
         },
         // Decentralized Identifier (DID)
         did: {

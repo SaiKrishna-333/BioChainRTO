@@ -1,4 +1,5 @@
 import { createContext } from "react";
+import type { RTODetails } from "../types/api";
 
 export interface DealerDetails {
   businessName: string;
@@ -19,6 +20,8 @@ export interface User {
   name: string;
   phone?: string | null;
   address?: string | null;
+  state?: string | null; // User's state code (KA, TN, etc.)
+  district?: string | null; // User's district
   aadhaarNumber?: string | null;
   dlNumber?: string | null;
   badgeNumber?: string | null; // For police
@@ -28,6 +31,7 @@ export interface User {
     contentType?: string;
   };
   dealerDetails?: DealerDetails;
+  rtoDetails?: RTODetails;
 }
 
 import type { AxiosInstance } from 'axios';

@@ -19,7 +19,7 @@ const upload = multer({
 
 router.post("/register", upload.single("profilePhoto"), async (req, res) => {
     try {
-        const { name, email, password, role, phone, address, aadhaarNumber, dlNumber, dealerDetails } = req.body;
+        const { name, email, password, role, phone, address, state, district, aadhaarNumber, dlNumber, badgeNumber, dealerDetails } = req.body;
 
         const existing = await User.findOne({ email });
         if (existing) {
@@ -35,8 +35,11 @@ router.post("/register", upload.single("profilePhoto"), async (req, res) => {
             role,
             phone,
             address,
+            state,
+            district,
             aadhaarNumber,
-            dlNumber
+            dlNumber,
+            badgeNumber // Save badge number for police users
         });
 
         // Save profile photo if uploaded
@@ -54,8 +57,8 @@ router.post("/register", upload.single("profilePhoto"), async (req, res) => {
 
         await user.save();
 
-        const templateId = await enrollFingerprint(user._id.toString());
-        user.fingerprintTemplateId = templateId;
+        // Don't pre-enroll fingerprint - frontend will handle biometric enrollment after user sees the capture modal
+        // The fingerprint template will be created when user completes the biometric capture in the UI
 
         // Generate DID for the user
         try {
@@ -120,16 +123,22 @@ router.put("/register/:id/biometric", async (req, res) => {
 router.post("/login", async (req, res) => {
     try {
         const { email, password } = req.body;
+        console.log(`Login attempt for email: ${email}`);
+
         const user = await User.findOne({ email });
 
         if (!user || !user.passwordHash) {
+            console.log(`Login failed: User not found or no password hash for ${email}`);
             return res.status(400).json({ message: "Invalid credentials" });
         }
 
         const match = await bcrypt.compare(password, user.passwordHash);
         if (!match) {
+            console.log(`Login failed: Password mismatch for ${email}`);
             return res.status(400).json({ message: "Invalid credentials" });
         }
+
+        console.log(`Login successful for: ${email} (${user.role})`);
 
         const token = jwt.sign(
             { userId: user._id },
@@ -140,18 +149,21 @@ router.post("/login", async (req, res) => {
         res.json({
             token,
             user: {
-                id: user._id,
+                id: user._id.toString(), // Return as string for consistency
                 name: user.name,
                 email: user.email,
                 role: user.role,
                 phone: user.phone || null,
                 address: user.address || null,
+                state: user.state || null,
+                district: user.district || null,
                 aadhaarNumber: user.aadhaarNumber || null,
                 dlNumber: user.dlNumber || null,
                 hasProfilePhoto: !!user.profilePhoto,  // Indicate if photo exists
                 did: user.did?.identifier || null,
                 biochainDid: user.did?.biochainDid || null,
-                dealerDetails: user.dealerDetails
+                dealerDetails: user.dealerDetails,
+                rtoDetails: user.rtoDetails
             }
         });
     } catch (err) {
@@ -210,13 +222,57 @@ router.put("/update-dealer-details", authRequired, async (req, res) => {
     }
 });
 
+// Route to update RTO details
+router.put("/update-rto-details", authRequired, async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const { rtoDetails } = req.body;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        if (user.role !== "rto") {
+            return res.status(403).json({ message: "Only RTO officers can update RTO details" });
+        }
+
+        // Initialize and update RTO details
+        user.rtoDetails = {
+            stateCode: '',
+            stateName: '',
+            district: '',
+            rtoOfficeCode: '',
+            rtoOfficeName: '',
+            designation: '',
+            employeeId: '',
+            officeAddress: '',
+            jurisdiction: '',
+            ...user.rtoDetails,
+            ...rtoDetails
+        };
+
+        await user.save();
+
+        res.json({
+            message: "RTO details updated successfully",
+            rtoDetails: user.rtoDetails
+        });
+    } catch (err) {
+        console.error("update RTO details error:", err.message);
+        res.status(500).json({ message: "Server error" });
+    }
+});
+
 // Update user profile
 router.put("/users/:id", authRequired, async (req, res) => {
     try {
         const { id } = req.params;
 
         // Verify user can only update their own profile
-        if (id !== req.user.id) {
+        // Convert both to strings for proper comparison
+        if (id.toString() !== req.user.id.toString()) {
+            console.log(`Profile update rejected: URL id=${id}, Authenticated user id=${req.user.id}`);
             return res.status(403).json({ message: "Unauthorized to update this profile" });
         }
 
@@ -314,7 +370,8 @@ router.put("/:id/biometric", authRequired, async (req, res) => {
         const { templateId, quality } = req.body;
 
         // Verify user can only update their own biometric data
-        if (id !== req.user.id) {
+        // Convert both to strings for proper comparison
+        if (id.toString() !== req.user.id.toString()) {
             return res.status(403).json({ message: "Unauthorized to update this biometric data" });
         }
 
@@ -349,7 +406,8 @@ router.put("/:id/photo", authRequired, upload.single("profilePhoto"), async (req
         const { id } = req.params;
 
         // Verify user can only update their own photo
-        if (id !== req.user.id) {
+        // Convert both to strings for proper comparison
+        if (id.toString() !== req.user.id.toString()) {
             return res.status(403).json({ message: "Unauthorized to update this photo" });
         }
 

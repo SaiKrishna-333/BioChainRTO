@@ -76,8 +76,8 @@ export default function BiometricCaptureModal({
     if (captureState === "processing") {
       // Simulate processing delay
       const timer = setTimeout(() => {
-        // 95% success rate
-        const success = Math.random() > 0.05;
+        // 100% success rate for simulation (change to Math.random() > 0.05 for realistic 95% rate)
+        const success = true; // Always succeed in simulation mode
         const quality = Math.floor(Math.random() * 20) + 80; // 80-100
         const template = `bio_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 

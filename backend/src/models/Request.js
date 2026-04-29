@@ -4,7 +4,7 @@ const requestSchema = new mongoose.Schema(
     {
         type: {
             type: String,
-            enum: ["newRegistration", "transfer"],
+            enum: ["newRegistration", "transfer", "interStateTransfer"],
             required: true
         },
         vehicle: { type: mongoose.Schema.Types.ObjectId, ref: "Vehicle" },
@@ -49,7 +49,40 @@ const requestSchema = new mongoose.Schema(
             blockchainTxHash: { type: String }
         },
         // Document verification status
-        documentsVerified: { type: Boolean, default: false }
+        documentsVerified: { type: Boolean, default: false },
+        // Multi-Authority Consensus Protocol (Feature 3)
+        consensus: {
+            type: Object,
+            default: null
+        },
+        // Inter-State Transfer Details
+        interStateDetails: {
+            currentState: { type: String }, // Source state code
+            targetState: { type: String }, // Destination state code
+            newAddress: { type: String }, // New address in destination state
+            currentRegNumber: { type: String },
+            newRegNumber: { type: String },
+            vehiclePassport: { type: Object }, // Generated vehicle passport
+            passportHash: { type: String }, // Passport verification hash
+            sourceRTOApproval: {
+                status: { type: String, default: "pending" },
+                officerId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+                officerName: { type: String },
+                rtoOffice: { type: String },
+                timestamp: { type: Date },
+                remarks: { type: String }
+            },
+            destinationRTOApproval: {
+                status: { type: String, default: "pending" },
+                officerId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+                officerName: { type: String },
+                rtoOffice: { type: String },
+                timestamp: { type: Date },
+                remarks: { type: String }
+            },
+            transferInitiatedAt: { type: Date },
+            completedAt: { type: Date }
+        }
     },
     { timestamps: true }
 );

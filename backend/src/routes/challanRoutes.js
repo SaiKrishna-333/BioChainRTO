@@ -47,10 +47,18 @@ router.post(
                 return res.status(400).json({ message: "Fine amount must be greater than 0" });
             }
 
-            // Verify vehicle exists
-            const vehicle = await Vehicle.findOne({
-                $or: [{ _id: vehicleId }, { regNumber }]
-            });
+            // Verify vehicle exists - use regNumber by default, or vehicleId if valid
+            let vehicle = null;
+
+            // First try to find by registration number (most reliable)
+            if (regNumber) {
+                vehicle = await Vehicle.findOne({ regNumber });
+            }
+
+            // If not found and vehicleId is valid (non-empty 24-char hex string), try by ID
+            if (!vehicle && vehicleId && vehicleId.length === 24 && /^[0-9a-fA-F]{24}$/.test(vehicleId)) {
+                vehicle = await Vehicle.findById(vehicleId);
+            }
 
             if (!vehicle) {
                 return res.status(404).json({ message: `Vehicle with registration '${regNumber}' not found` });

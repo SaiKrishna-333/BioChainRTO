@@ -11,6 +11,8 @@ export default function Register() {
     role: "owner",
     phone: "",
     address: "",
+    state: "",
+    district: "",
     aadhaarNumber: "",
     dlNumber: "",
     badgeNumber: "", // For police
@@ -57,6 +59,8 @@ export default function Register() {
       formDataToSend.append("role", formData.role);
       formDataToSend.append("phone", formData.phone);
       formDataToSend.append("address", formData.address);
+      formDataToSend.append("state", formData.state);
+      formDataToSend.append("district", formData.district);
       formDataToSend.append("aadhaarNumber", formData.aadhaarNumber);
       formDataToSend.append("dlNumber", formData.dlNumber);
       if (formData.role === "police" && formData.badgeNumber) {
@@ -255,6 +259,62 @@ export default function Register() {
                     placeholder="Enter your complete address"
                     required
                   />
+                </div>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "15px",
+                    marginBottom: "1rem",
+                  }}
+                >
+                  <div className="form-group">
+                    <label>State *</label>
+                    <select
+                      name="state"
+                      value={formData.state}
+                      onChange={handleChange}
+                      required
+                      style={{
+                        width: "100%",
+                        padding: "0.75rem",
+                        border: "1px solid #ddd",
+                        borderRadius: "6px",
+                        fontSize: "1rem",
+                      }}
+                    >
+                      <option value="">Select State</option>
+                      <option value="AP">Andhra Pradesh</option>
+                      <option value="TS">Telangana</option>
+                      <option value="KA">Karnataka</option>
+                      <option value="TN">Tamil Nadu</option>
+                      <option value="MH">Maharashtra</option>
+                      <option value="DL">Delhi</option>
+                      <option value="GJ">Gujarat</option>
+                      <option value="RJ">Rajasthan</option>
+                      <option value="UP">Uttar Pradesh</option>
+                      <option value="MP">Madhya Pradesh</option>
+                      <option value="KL">Kerala</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label>District *</label>
+                    <input
+                      type="text"
+                      name="district"
+                      value={formData.district}
+                      onChange={handleChange}
+                      placeholder="e.g., Bangalore Urban"
+                      required
+                      style={{
+                        width: "100%",
+                        padding: "0.75rem",
+                        border: "1px solid #ddd",
+                        borderRadius: "6px",
+                        fontSize: "1rem",
+                      }}
+                    />
+                  </div>
                 </div>
                 <div
                   style={{

@@ -11,6 +11,8 @@ import { useAuth } from "../context/useAuth";
 import { useNavigate } from "react-router-dom";
 import DualBiometricVerification from "../components/DualBiometricVerification";
 import DocumentExpiryAlerts from "../components/DocumentExpiryAlerts";
+import DemoPaymentModal from "../components/DemoPaymentModal";
+import ProfileButton from "../components/ProfileButton";
 
 import type { Vehicle } from "../types/api";
 
@@ -68,6 +70,41 @@ export default function OwnerDashboard() {
     relationshipProofDoc: null as File | null,
   });
 
+  // Inter-state transfer form state
+  const [interStateFormData, setInterStateFormData] = useState({
+    vehicleId: "",
+    fromState: "",
+    toState: "",
+    newAddress: "",
+  });
+  const [interStatePassport, setInterStatePassport] = useState<any>(null);
+
+  // Indian State Codes
+  const STATE_CODES: { [key: string]: string } = {
+    KA: "Karnataka",
+    MH: "Maharashtra",
+    TN: "Tamil Nadu",
+    AP: "Andhra Pradesh",
+    TS: "Telangana",
+    KL: "Kerala",
+    DL: "Delhi",
+    GJ: "Gujarat",
+    RJ: "Rajasthan",
+    MP: "Madhya Pradesh",
+    UP: "Uttar Pradesh",
+    WB: "West Bengal",
+    PB: "Punjab",
+    HR: "Haryana",
+    JK: "Jammu & Kashmir",
+    GA: "Goa",
+    OR: "Odisha",
+    CG: "Chhattisgarh",
+    JH: "Jharkhand",
+    BR: "Bihar",
+    AS: "Assam",
+    NE: "Northeast States",
+  };
+
   const [profileData, setProfileData] = useState({
     name: "",
     email: "",
@@ -84,6 +121,25 @@ export default function OwnerDashboard() {
   const [pendingTransfer, setPendingTransfer] = useState<{
     vehicleId: string;
     buyerEmail: string;
+  } | null>(null);
+
+  // Challan state
+  const [pendingChallans, setPendingChallans] = useState<
+    {
+      _id: string;
+      regNumber: string;
+      violationType: string;
+      violationDescription: string;
+      fineAmount: number;
+      paymentStatus: string;
+    }[]
+  >([]);
+  const [totalPendingAmount, setTotalPendingAmount] = useState(0);
+  const [showChallanPayment, setShowChallanPayment] = useState(false);
+  const [selectedChallan, setSelectedChallan] = useState<{
+    _id: string;
+    amount: number;
+    description: string;
   } | null>(null);
 
   const loadProfileData = useCallback(async () => {
@@ -129,7 +185,7 @@ export default function OwnerDashboard() {
         const formData = new FormData();
         formData.append("profilePhoto", profilePhotoFile);
 
-        await api.put(`/users/${user.id}/photo`, formData, {
+        await api.put(`/auth/${user.id}/photo`, formData, {
           headers: {
             "Content-Type": "multipart/form-data",
           },
@@ -137,7 +193,7 @@ export default function OwnerDashboard() {
       }
 
       // Update other profile data
-      await api.put(`/users/${user.id}`, profileData);
+      await api.put(`/auth/users/${user.id}`, profileData);
       alert("Profile updated successfully!");
       setIsEditingProfile(false);
       setProfilePhotoFile(null);
@@ -166,6 +222,33 @@ export default function OwnerDashboard() {
       console.error("Error fetching invoices:", err);
     }
   }, [api]);
+
+  const fetchPendingChallans = useCallback(async () => {
+    try {
+      const res = await api.get("/challans/pending");
+      setPendingChallans(res.data.challans);
+      setTotalPendingAmount(res.data.totalPending);
+    } catch (err: unknown) {
+      console.error("Error fetching pending challans:", err);
+    }
+  }, [api]);
+
+  const handleChallanPayment = async () => {
+    if (!selectedChallan) return;
+    try {
+      await api.put(`/challans/${selectedChallan._id}/pay`, {
+        paymentMethod: "online",
+        paidAmount: selectedChallan.amount,
+      });
+      alert("✅ Challan paid successfully!");
+      setShowChallanPayment(false);
+      setSelectedChallan(null);
+      await fetchPendingChallans();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to pay challan";
+      alert(msg);
+    }
+  };
 
   const fetchVehicleHistory = async (vehicleId: string, regNumber: string) => {
     try {
@@ -341,6 +424,42 @@ export default function OwnerDashboard() {
     }
   };
 
+  // Handle Inter-State Transfer Submit
+  const handleInterStateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const response = await api.post("/interStateTransfer/generate-passport", {
+        vehicleId: interStateFormData.vehicleId,
+        fromState: interStateFormData.fromState,
+        toState: interStateFormData.toState,
+        newAddress: interStateFormData.newAddress,
+      });
+
+      if (response.data.passport) {
+        setInterStatePassport(response.data);
+        alert(
+          "Vehicle Passport generated successfully! Passport valid for 30 days.",
+        );
+      } else {
+        alert("Inter-state transfer request submitted! RTO approval pending.");
+      }
+
+      setInterStateFormData({
+        vehicleId: "",
+        fromState: "",
+        toState: "",
+        newAddress: "",
+      });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      alert(
+        "Error requesting inter-state transfer: " +
+          (err as { response?: { data?: { message?: string } } })?.response
+            ?.data?.message || errorMessage,
+      );
+    }
+  };
+
   // Load vehicles and profile on mount
   useEffect(() => {
     if (!user) {
@@ -351,9 +470,17 @@ export default function OwnerDashboard() {
       await fetchVehicles();
       await loadProfileData();
       await fetchInvoices();
+      await fetchPendingChallans();
     };
     loadData();
-  }, [user, navigate, fetchVehicles, loadProfileData, fetchInvoices]);
+  }, [
+    user,
+    navigate,
+    fetchVehicles,
+    loadProfileData,
+    fetchInvoices,
+    fetchPendingChallans,
+  ]);
 
   return (
     <div className="container">
@@ -362,6 +489,7 @@ export default function OwnerDashboard() {
           <h2>BioChain RTO - Owner Dashboard</h2>
           <div className="nav-links">
             <span className="role-badge role-owner">OWNER</span>
+            <ProfileButton />
             <button
               className="btn btn-danger"
               onClick={() => {
@@ -402,10 +530,36 @@ export default function OwnerDashboard() {
             Inheritance Transfer
           </button>
           <button
+            className={`tab-btn ${activeTab === "interState" ? "active" : ""}`}
+            onClick={() => setActiveTab("interState")}
+          >
+            Inter-State Transfer
+          </button>
+          <button
             className={`tab-btn ${activeTab === "invoices" ? "active" : ""}`}
             onClick={() => setActiveTab("invoices")}
           >
             My Invoices
+          </button>
+          <button
+            className={`tab-btn ${activeTab === "challans" ? "active" : ""}`}
+            onClick={() => setActiveTab("challans")}
+          >
+            Pending Challans
+            {pendingChallans.length > 0 && (
+              <span
+                style={{
+                  background: "#ef4444",
+                  color: "white",
+                  borderRadius: "50%",
+                  padding: "2px 8px",
+                  fontSize: "12px",
+                  marginLeft: "5px",
+                }}
+              >
+                {pendingChallans.length}
+              </span>
+            )}
           </button>
           <button
             className={`tab-btn ${activeTab === "profile" ? "active" : ""}`}
@@ -829,6 +983,132 @@ export default function OwnerDashboard() {
             </div>
           </div>
         )}
+
+        {/* Inter-State Transfer Tab */}
+        {activeTab === "interState" && (
+          <div className="card">
+            <h3>🌐 Inter-State Vehicle Transfer</h3>
+            <p style={{ color: "#666", marginBottom: "20px" }}>
+              Transfer your vehicle to a different state. Generate a vehicle
+              passport for seamless RTO verification.
+            </p>
+
+            <form onSubmit={handleInterStateSubmit}>
+              <div className="form-group">
+                <label>Select Vehicle</label>
+                <select
+                  value={interStateFormData.vehicleId}
+                  onChange={(e) =>
+                    setInterStateFormData({
+                      ...interStateFormData,
+                      vehicleId: e.target.value,
+                    })
+                  }
+                  required
+                >
+                  <option value="">-- Select Vehicle --</option>
+                  {vehicles.map((v) => (
+                    <option key={v._id} value={v._id}>
+                      {v.regNumber} - {v.make} {v.model}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>From State</label>
+                <select
+                  value={interStateFormData.fromState}
+                  onChange={(e) =>
+                    setInterStateFormData({
+                      ...interStateFormData,
+                      fromState: e.target.value,
+                    })
+                  }
+                  required
+                >
+                  <option value="">-- Select State --</option>
+                  {Object.entries(STATE_CODES).map(([code, name]) => (
+                    <option key={code} value={code}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>To State</label>
+                <select
+                  value={interStateFormData.toState}
+                  onChange={(e) =>
+                    setInterStateFormData({
+                      ...interStateFormData,
+                      toState: e.target.value,
+                    })
+                  }
+                  required
+                >
+                  <option value="">-- Select State --</option>
+                  {Object.entries(STATE_CODES).map(([code, name]) => (
+                    <option key={code} value={code}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>New Address in Destination State</label>
+                <input
+                  type="text"
+                  value={interStateFormData.newAddress}
+                  onChange={(e) =>
+                    setInterStateFormData({
+                      ...interStateFormData,
+                      newAddress: e.target.value,
+                    })
+                  }
+                  placeholder="Enter new address"
+                  required
+                />
+              </div>
+
+              <button type="submit" className="btn btn-success">
+                🚚 Request Inter-State Transfer
+              </button>
+            </form>
+
+            {interStatePassport && (
+              <div
+                style={{
+                  marginTop: "20px",
+                  padding: "15px",
+                  background: "#e8f5e9",
+                  borderRadius: "8px",
+                }}
+              >
+                <h4>✅ Vehicle Passport Generated</h4>
+                <p>
+                  <strong>Passport ID:</strong> {interStatePassport.passportId}
+                </p>
+                <p>
+                  <strong>From State:</strong>{" "}
+                  {interStatePassport.passport?.vehicle?.state}
+                </p>
+                <p>
+                  <strong>To State:</strong> {interStateFormData.toState}
+                </p>
+                <p>
+                  <strong>Valid For:</strong> 30 days
+                </p>
+                <p style={{ fontSize: "12px", color: "#666" }}>
+                  <strong>Passport Hash:</strong>{" "}
+                  {interStatePassport.passportHash?.substring(0, 20)}...
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Invoices Tab */}
@@ -886,6 +1166,134 @@ export default function OwnerDashboard() {
               No invoices found. Your vehicle purchase invoices will appear here
               after registration.
             </p>
+          )}
+        </div>
+      )}
+
+      {/* Challans Tab */}
+      {activeTab === "challans" && (
+        <div className="card">
+          <h4>🚨 Pending Traffic Challans</h4>
+
+          {totalPendingAmount > 0 && (
+            <div
+              style={{
+                background: "#fef3c7",
+                padding: "15px",
+                borderRadius: "8px",
+                marginBottom: "20px",
+                border: "2px solid #f59e0b",
+              }}
+            >
+              <strong style={{ fontSize: "16px", color: "#92400e" }}>
+                ⚠️ Total Pending Amount: ₹{totalPendingAmount.toLocaleString()}
+              </strong>
+              <p
+                style={{
+                  margin: "5px 0 0",
+                  fontSize: "13px",
+                  color: "#92400e",
+                }}
+              >
+                🚫 Note: Vehicle transfer is blocked until all challans are
+                cleared. RTO will not approve any transfer requests with pending
+                dues.
+              </p>
+            </div>
+          )}
+
+          {pendingChallans.length === 0 ? (
+            <div
+              style={{
+                textAlign: "center",
+                padding: "60px 20px",
+                color: "#10b981",
+              }}
+            >
+              <div style={{ fontSize: "64px", marginBottom: "20px" }}>✅</div>
+              <h3 style={{ margin: "0 0 10px" }}>No Pending Challans!</h3>
+              <p style={{ margin: 0, fontSize: "14px", color: "#666" }}>
+                Your vehicle record is clear. You're good to go!
+              </p>
+            </div>
+          ) : (
+            <>
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Vehicle</th>
+                    <th>Violation Type</th>
+                    <th>Description</th>
+                    <th>Fine Amount</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingChallans.map((challan) => (
+                    <tr key={challan._id}>
+                      <td>
+                        <strong>{challan.regNumber}</strong>
+                      </td>
+                      <td>
+                        <span
+                          className="role-badge"
+                          style={{
+                            background:
+                              challan.violationType === "drunk_driving"
+                                ? "#ef4444"
+                                : "#f59e0b",
+                            color: "white",
+                          }}
+                        >
+                          {challan.violationType
+                            .replace(/_/g, " ")
+                            .toUpperCase()}
+                        </span>
+                      </td>
+                      <td>{challan.violationDescription}</td>
+                      <td>
+                        <strong style={{ color: "#ef4444", fontSize: "16px" }}>
+                          ₹{challan.fineAmount.toLocaleString()}
+                        </strong>
+                      </td>
+                      <td>
+                        <button
+                          className="btn btn-success"
+                          onClick={() => {
+                            setSelectedChallan({
+                              _id: challan._id,
+                              amount: challan.fineAmount,
+                              description: `${challan.violationType.replace(/_/g, " ").toUpperCase()} - ${challan.regNumber}`,
+                            });
+                            setShowChallanPayment(true);
+                          }}
+                          style={{
+                            background:
+                              "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+                          }}
+                        >
+                          💳 Pay Now
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div
+                style={{
+                  marginTop: "20px",
+                  padding: "15px",
+                  background: "#f3f4f6",
+                  borderRadius: "8px",
+                  textAlign: "center",
+                }}
+              >
+                <strong>Total Challans:</strong> {pendingChallans.length} |{" "}
+                <strong>Total Amount:</strong> ₹
+                {totalPendingAmount.toLocaleString()}
+              </div>
+            </>
           )}
         </div>
       )}
@@ -1126,6 +1534,19 @@ export default function OwnerDashboard() {
         person2Name="Buyer"
         person2Role="owner"
         transactionType="ownership-transfer"
+      />
+
+      {/* Challan Payment Modal */}
+      <DemoPaymentModal
+        isOpen={showChallanPayment}
+        onClose={() => {
+          setShowChallanPayment(false);
+          setSelectedChallan(null);
+        }}
+        amount={selectedChallan?.amount || 0}
+        title="Pay Traffic Challan"
+        description={selectedChallan?.description || "Traffic Violation Fine"}
+        onSuccess={handleChallanPayment}
       />
     </div>
   );

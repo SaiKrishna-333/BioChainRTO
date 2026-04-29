@@ -15,8 +15,14 @@ export default function Login() {
       const user = await login(email, password);
       if (user.role === "dealer") navigate("/dealer");
       else if (user.role === "owner") navigate("/owner");
-      else if (user.role === "rto") navigate("/rto");
-      else if (user.role === "police") navigate("/police");
+      else if (user.role === "rto") {
+        // Check if RTO details are set up
+        if (!user.rtoDetails?.stateCode) {
+          navigate("/rto-setup");
+        } else {
+          navigate("/rto");
+        }
+      } else if (user.role === "police") navigate("/police");
     } catch (err) {
       console.error("Login failed:", err);
       setError(err instanceof Error ? err.message : "Invalid credentials");

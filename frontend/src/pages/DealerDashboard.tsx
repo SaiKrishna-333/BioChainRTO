@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/useAuth";
 import { useNavigate } from "react-router-dom";
 import DualBiometricVerification from "../components/DualBiometricVerification";
+import ProfileButton from "../components/ProfileButton";
 
 export default function DealerDashboard() {
   const { user, logout, api } = useAuth();
@@ -277,6 +278,7 @@ export default function DealerDashboard() {
           <h2>BioChain RTO - Dealer Dashboard</h2>
           <div className="nav-links">
             <span className="role-badge role-dealer">DEALER</span>
+            <ProfileButton />
             <button
               className="btn btn-danger"
               onClick={() => {

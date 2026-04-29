@@ -21,7 +21,7 @@ export const authRequired = async (req, res, next) => {
         }
 
         req.user = {
-            id: user._id,
+            id: user._id.toString(), // Store as string for easier comparison
             role: user.role,
             name: user.name,
             email: user.email,

@@ -62,7 +62,8 @@ export default function RCCertificate({
     owner: owner.name,
     registrationDate,
     validUpto,
-    blockchainTxHash: blockchainTxHash || "",
+    blockchainTxHash: blockchainTxHash || "PENDING",
+    status: blockchainTxHash ? "VERIFIED" : "PENDING_BLOCKCHAIN",
   });
 
   const getTransferTypeLabel = () => {
@@ -256,9 +257,12 @@ export default function RCCertificate({
             {!blockchainTxHash && (
               <div className="rc-blockchain-item">
                 <label>TRANSACTION HASH</label>
-                <span className="rc-hash">
-                  <span className="rc-dot rc-dot-cyan"></span>
-                  0x3a9f8c1b2e4d7a0f5c8b3e6d9a2f4c7b1e3d6a9f2c5b8e1
+                <span className="rc-hash" style={{ color: "#ff9933" }}>
+                  <span
+                    className="rc-dot rc-dot-cyan"
+                    style={{ background: "#ff9933" }}
+                  ></span>
+                  PENDING - Blockchain sync in progress...
                 </span>
               </div>
             )}

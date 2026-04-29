@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../context/useAuth";
 import { useNavigate } from "react-router-dom";
 import ChallanManagement from "../components/ChallanManagement";
+import ProfileButton from "../components/ProfileButton";
 
 import type {
   QuickVerifyResult,
@@ -27,7 +28,7 @@ export default function PoliceDashboard() {
     | null;
 
   const [result, setResult] = useState<VerificationResult>(null);
-  const [activeTab, setActiveTab] = useState("quickVerify"); // 'quickVerify', 'detailedVerify', 'personVerify', 'theftReports', 'challans', 'profile'
+  const [activeTab, setActiveTab] = useState("quickVerify"); // 'quickVerify', 'detailedVerify', 'personVerify', 'privacyVerify', 'theftReports', 'challans', 'profile'
   const [theftReports, setTheftReports] = useState<TheftReportAdmin[]>([]);
   const [recoveryData, setRecoveryData] = useState<{
     [key: string]: {
@@ -37,8 +38,12 @@ export default function PoliceDashboard() {
     };
   }>({});
   const [showRecoveryModal, setShowRecoveryModal] = useState<string | null>(
-    null
+    null,
   );
+
+  // Privacy verification state
+  const [privacyRegNumber, setPrivacyRegNumber] = useState("");
+  const [privacyResult, setPrivacyResult] = useState<any>(null);
   const [profileData, setProfileData] = useState({
     name: "",
     email: "",
@@ -81,6 +86,21 @@ export default function PoliceDashboard() {
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Verification failed";
       alert(msg);
+    }
+  };
+
+  // Handle Privacy-Preserving Verification
+  const handlePrivacyVerify = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await api.get(
+        `/patent/privacy/verify-by-reg/${privacyRegNumber}`,
+      );
+      setPrivacyResult(res.data);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Verification failed";
+      alert(msg);
+      setPrivacyResult(null);
     }
   };
 
@@ -143,6 +163,7 @@ export default function PoliceDashboard() {
           <h2>BioChain RTO - Police Dashboard</h2>
           <div className="nav-links">
             <span className="role-badge role-police">POLICE</span>
+            <ProfileButton />
             <button
               className="btn btn-primary"
               onClick={() => navigate("/search")}
@@ -194,6 +215,14 @@ export default function PoliceDashboard() {
             onClick={() => setActiveTab("personVerify")}
           >
             Person Verify
+          </button>
+          <button
+            className={`tab-btn ${
+              activeTab === "privacyVerify" ? "active" : ""
+            }`}
+            onClick={() => setActiveTab("privacyVerify")}
+          >
+            🔒 Privacy Verify
           </button>
           <button
             className={`tab-btn ${
@@ -275,6 +304,174 @@ export default function PoliceDashboard() {
               Verify Person
             </button>
           </form>
+        )}
+
+        {/* Privacy Verify Tab */}
+        {activeTab === "privacyVerify" && (
+          <div className="card" style={{ background: "#f8fafc" }}>
+            <h3>🔒 Privacy-Preserving Verification</h3>
+            <p style={{ color: "#666", marginBottom: "20px" }}>
+              Verify vehicle ownership WITHOUT exposing personal data.
+              GDPR-compliant verification.
+            </p>
+            <form onSubmit={handlePrivacyVerify}>
+              <div className="form-group">
+                <label>Vehicle Registration Number</label>
+                <input
+                  type="text"
+                  value={privacyRegNumber}
+                  onChange={(e) => setPrivacyRegNumber(e.target.value)}
+                  placeholder="KA01AB1234"
+                  required
+                />
+              </div>
+              <button type="submit" className="btn btn-primary">
+                🔒 Verify (Privacy Mode)
+              </button>
+            </form>
+
+            {privacyResult && (
+              <div
+                style={{
+                  marginTop: "20px",
+                  padding: "15px",
+                  background: "#e8f5e9",
+                  borderRadius: "8px",
+                  border: "2px solid #4caf50",
+                }}
+              >
+                <h4 style={{ color: "#2e7d32", marginBottom: "15px" }}>
+                  ✅ Verification Result
+                </h4>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: "10px",
+                  }}
+                >
+                  <div
+                    style={{
+                      background: "white",
+                      padding: "10px",
+                      borderRadius: "5px",
+                    }}
+                  >
+                    <strong style={{ color: "#666", fontSize: "12px" }}>
+                      Ownership Status
+                    </strong>
+                    <p
+                      style={{
+                        color: "#4caf50",
+                        fontWeight: "bold",
+                        margin: "5px 0 0 0",
+                      }}
+                    >
+                      {privacyResult.ownershipStatus || "VERIFIED_OWNER"}
+                    </p>
+                  </div>
+
+                  <div
+                    style={{
+                      background: "white",
+                      padding: "10px",
+                      borderRadius: "5px",
+                    }}
+                  >
+                    <strong style={{ color: "#666", fontSize: "12px" }}>
+                      Owner DID
+                    </strong>
+                    <p
+                      style={{
+                        color: "#1976d2",
+                        fontWeight: "bold",
+                        margin: "5px 0 0 0",
+                        fontSize: "12px",
+                        wordBreak: "break-all",
+                      }}
+                    >
+                      {privacyResult.ownerDID ||
+                        privacyResult.did ||
+                        "did:biochain:owner:..."}
+                    </p>
+                  </div>
+
+                  <div
+                    style={{
+                      background: "white",
+                      padding: "10px",
+                      borderRadius: "5px",
+                    }}
+                  >
+                    <strong style={{ color: "#666", fontSize: "12px" }}>
+                      Vehicle Status
+                    </strong>
+                    <p
+                      style={{
+                        color: "#4caf50",
+                        fontWeight: "bold",
+                        margin: "5px 0 0 0",
+                      }}
+                    >
+                      {privacyResult.vehicleStatus ||
+                        privacyResult.status ||
+                        "ACTIVE"}
+                    </p>
+                  </div>
+
+                  <div
+                    style={{
+                      background: "white",
+                      padding: "10px",
+                      borderRadius: "5px",
+                    }}
+                  >
+                    <strong style={{ color: "#666", fontSize: "12px" }}>
+                      Registration
+                    </strong>
+                    <p
+                      style={{
+                        color: "#333",
+                        fontWeight: "bold",
+                        margin: "5px 0 0 0",
+                      }}
+                    >
+                      {privacyResult.regNumber || "Verified"}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "15px",
+                    padding: "10px",
+                    background: "#fff3e0",
+                    borderRadius: "5px",
+                  }}
+                >
+                  <h5 style={{ color: "#e65100", marginBottom: "10px" }}>
+                    ⚠️ NO Personal Data Exposed
+                  </h5>
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr 1fr",
+                      gap: "5px",
+                      fontSize: "14px",
+                    }}
+                  >
+                    <span>❌ Name</span>
+                    <span>❌ Address</span>
+                    <span>❌ Phone Number</span>
+                    <span>❌ Aadhaar</span>
+                    <span>❌ Email</span>
+                    <span>❌ DL Number</span>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Theft Reports Tab */}
@@ -460,7 +657,7 @@ export default function PoliceDashboard() {
                           {" "}
                           • Date:{" "}
                           {new Date(
-                            result.theftReport.incidentDate
+                            result.theftReport.incidentDate,
                           ).toLocaleDateString()}
                         </p>
                       </div>
@@ -628,7 +825,7 @@ export default function PoliceDashboard() {
               e.preventDefault();
               if (!user) return;
               try {
-                await api.put(`/users/${user.id}`, profileData);
+                await api.put(`/auth/users/${user.id}`, profileData);
                 alert("Profile updated successfully!");
               } catch (err: unknown) {
                 const msg =

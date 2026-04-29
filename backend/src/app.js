@@ -16,6 +16,8 @@ import didRoutes from "./routes/didRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
 import analyticsRoutes from "./routes/analyticsRoutes.js";
 import challanRoutes from "./routes/challanRoutes.js";
+import patentFeaturesRoutes from "./routes/patentFeaturesRoutes.js";
+import interStateTransferRoutes from "./routes/interStateTransferRoutes.js";
 
 const app = express();
 
@@ -43,6 +45,8 @@ app.use("/api/did", didRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/analytics", analyticsRoutes);
 app.use("/api/challans", challanRoutes);
+app.use("/api/patent-features", patentFeaturesRoutes);
+app.use("/api/inter-state", interStateTransferRoutes);
 
 app.get("/", (req, res) => {
     res.json({ message: "BioChain RTO API is running" });
